@@ -116,7 +116,7 @@ export const DriverDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDriverData();
-    const interval = setInterval(loadDriverData, 4000);
+    const interval = setInterval(loadDriverData, 2500);
     return () => clearInterval(interval);
   }, [user]);
 
