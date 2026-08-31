@@ -81,6 +81,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setUser(res.user);
       joinSocketUser(res.user);
+    } catch (err) {
+      console.error('Login error:', err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -94,6 +97,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setUser(res.user);
       joinSocketUser(res.user);
+    } catch (err) {
+      console.error('Registration error:', err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
