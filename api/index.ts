@@ -198,10 +198,36 @@ const getInitialSeed = (): DatabaseSchema => {
 const globalDb: { db: DatabaseSchema } = (global as any)._nasr_db || { db: getInitialSeed() };
 (global as any)._nasr_db = globalDb;
 
+function getKvCredentials(): { url?: string; token?: string } {
+  const env = process.env;
+  let url =
+    env.STORAGE_REST_API_URL ||
+    env.UPSTASH_REDIS_REST_URL ||
+    env.KV_REST_API_URL ||
+    env.REDIS_REST_API_URL;
+
+  let token =
+    env.STORAGE_REST_API_TOKEN ||
+    env.UPSTASH_REDIS_REST_TOKEN ||
+    env.KV_REST_API_TOKEN ||
+    env.REDIS_REST_API_TOKEN;
+
+  // Dynamic discovery if custom prefix is used
+  if (!url) {
+    const urlKey = Object.keys(env).find((k) => k.endsWith('_REST_API_URL') && env[k]);
+    if (urlKey) url = env[urlKey];
+  }
+  if (!token) {
+    const tokenKey = Object.keys(env).find((k) => (k.endsWith('_REST_API_TOKEN') || k.endsWith('_TOKEN')) && env[k]);
+    if (tokenKey) token = env[tokenKey];
+  }
+
+  return { url, token };
+}
+
 // Vercel Redis / Upstash Cloud Database Sync
 async function syncFromCloud(): Promise<void> {
-  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.REDIS_REST_API_TOKEN || process.env.REDIS_TOKEN;
+  const { url: kvUrl, token: kvToken } = getKvCredentials();
   if (!kvUrl || !kvToken) return;
 
   try {
@@ -223,8 +249,7 @@ async function syncFromCloud(): Promise<void> {
 }
 
 async function syncToCloud(): Promise<void> {
-  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.REDIS_REST_API_TOKEN || process.env.REDIS_TOKEN;
+  const { url: kvUrl, token: kvToken } = getKvCredentials();
   if (!kvUrl || !kvToken) return;
 
   try {
