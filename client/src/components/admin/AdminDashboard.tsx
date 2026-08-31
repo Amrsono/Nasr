@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
-import { Trip, AdminMetrics, DriverWithStats } from '../../types';
+import { Trip, AdminMetrics, DriverWithStats, FixedRoutePrice } from '../../types';
 import {
   Shield,
   DollarSign,
@@ -23,6 +23,9 @@ import {
   Phone,
   Mail,
   CheckCircle2,
+  ArrowLeftRight,
+  MapPin,
+  Plus,
 } from 'lucide-react';
 
 const DRIVER_AVATARS = [
@@ -34,6 +37,24 @@ const DRIVER_AVATARS = [
   'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
 ];
 
+const PRESET_ZONE_LOCATIONS = [
+  'Tahrir Square (Downtown)',
+  'Cairo Airport Terminal 3',
+  'Citystars Mall (Nasr City)',
+  'Zamalek (Gezira Island)',
+  'New Cairo (5th Settlement)',
+  'Maadi Corniche',
+  'Giza Pyramids',
+  'Heliopolis (Korba)',
+  'Sheikh Zayed (Arkan Plaza)',
+  '6th of October City',
+  'Mohandessin (Sphinx Square)',
+  'Rehab City',
+  'Madinaty',
+  'Shorouk City',
+  'New Administrative Capital',
+];
+
 export const AdminDashboard: React.FC = () => {
   const { settings, refreshSettings } = useAuth();
   const { t, i18n } = useTranslation();
@@ -43,7 +64,7 @@ export const AdminDashboard: React.FC = () => {
   const [drivers, setDrivers] = useState<DriverWithStats[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'trips' | 'drivers' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'trips' | 'drivers' | 'pricing' | 'settings'>('overview');
 
   // Driver Fleet Management Modal States
   const [driverSearch, setDriverSearch] = useState('');
@@ -74,6 +95,27 @@ export const AdminDashboard: React.FC = () => {
   const [editCarColor, setEditCarColor] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
   const [editIsOnline, setEditIsOnline] = useState(true);
+
+  // Route Pricing States
+  const [routeSearch, setRouteSearch] = useState('');
+  const [showAddRouteModal, setShowAddRouteModal] = useState(false);
+  const [showEditRouteModal, setShowEditRouteModal] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState<FixedRoutePrice | null>(null);
+  const [isProcessingRoute, setIsProcessingRoute] = useState(false);
+
+  // Form states for Add Route
+  const [addPickupName, setAddPickupName] = useState(PRESET_ZONE_LOCATIONS[0]);
+  const [addDestName, setAddDestName] = useState(PRESET_ZONE_LOCATIONS[1]);
+  const [addRoutePrice, setAddRoutePrice] = useState('180');
+  const [addIsBidirectional, setAddIsBidirectional] = useState(true);
+  const [addRouteIsActive, setAddRouteIsActive] = useState(true);
+
+  // Form states for Edit Route
+  const [editPickupName, setEditPickupName] = useState('');
+  const [editDestName, setEditDestName] = useState('');
+  const [editRoutePrice, setEditRoutePrice] = useState('');
+  const [editIsBidirectional, setEditIsBidirectional] = useState(true);
+  const [editRouteIsActive, setEditRouteIsActive] = useState(true);
 
   // Settings State
   const [apiKeyInput, setApiKeyInput] = useState(settings?.googleMapsApiKey || '');
@@ -256,6 +298,108 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleOpenAddRoute = () => {
+    setAddPickupName(PRESET_ZONE_LOCATIONS[0]);
+    setAddDestName(PRESET_ZONE_LOCATIONS[1]);
+    setAddRoutePrice('180');
+    setAddIsBidirectional(true);
+    setAddRouteIsActive(true);
+    setShowAddRouteModal(true);
+  };
+
+  const handleCreateRoute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addPickupName.trim() || !addDestName.trim() || !addRoutePrice) return;
+    setIsProcessingRoute(true);
+    try {
+      const currentRoutes = settings?.fixedRoutes || [];
+      const newRoute: FixedRoutePrice = {
+        id: `route_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        pickupName: addPickupName.trim(),
+        destinationName: addDestName.trim(),
+        price: parseFloat(addRoutePrice) || 0,
+        isBidirectional: addIsBidirectional,
+        isActive: addRouteIsActive,
+        createdAt: new Date().toISOString(),
+      };
+      const updatedRoutes = [...currentRoutes, newRoute];
+      await api.updateSettings({ fixedRoutes: updatedRoutes });
+      await refreshSettings();
+      setShowAddRouteModal(false);
+      showToast(t('admin.routeAdded'));
+    } catch (err: any) {
+      alert(err.message || 'Failed to create route');
+    } finally {
+      setIsProcessingRoute(false);
+    }
+  };
+
+  const handleOpenEditRoute = (route: FixedRoutePrice) => {
+    setSelectedRoute(route);
+    setEditPickupName(route.pickupName);
+    setEditDestName(route.destinationName);
+    setEditRoutePrice(String(route.price));
+    setEditIsBidirectional(route.isBidirectional ?? true);
+    setEditRouteIsActive(route.isActive);
+    setShowEditRouteModal(true);
+  };
+
+  const handleUpdateRoute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRoute) return;
+    setIsProcessingRoute(true);
+    try {
+      const currentRoutes = settings?.fixedRoutes || [];
+      const updatedRoutes = currentRoutes.map((r) => {
+        if (r.id === selectedRoute.id) {
+          return {
+            ...r,
+            pickupName: editPickupName.trim(),
+            destinationName: editDestName.trim(),
+            price: parseFloat(editRoutePrice) || 0,
+            isBidirectional: editIsBidirectional,
+            isActive: editRouteIsActive,
+          };
+        }
+        return r;
+      });
+      await api.updateSettings({ fixedRoutes: updatedRoutes });
+      await refreshSettings();
+      setShowEditRouteModal(false);
+      setSelectedRoute(null);
+      showToast(t('admin.routeUpdated'));
+    } catch (err: any) {
+      alert(err.message || 'Failed to update route');
+    } finally {
+      setIsProcessingRoute(false);
+    }
+  };
+
+  const handleToggleRouteActive = async (route: FixedRoutePrice) => {
+    try {
+      const currentRoutes = settings?.fixedRoutes || [];
+      const updatedRoutes = currentRoutes.map((r) => (r.id === route.id ? { ...r, isActive: !r.isActive } : r));
+      await api.updateSettings({ fixedRoutes: updatedRoutes });
+      await refreshSettings();
+      showToast(t('admin.routeUpdated'));
+    } catch (err: any) {
+      alert(err.message || 'Failed to update route status');
+    }
+  };
+
+  const handleDeleteRoute = async (route: FixedRoutePrice) => {
+    if (!window.confirm(`${t('admin.deleteRoutePriceConfirm')} (${route.pickupName} ➔ ${route.destinationName})`)) return;
+    try {
+      const currentRoutes = settings?.fixedRoutes || [];
+      const updatedRoutes = currentRoutes.filter((r) => r.id !== route.id);
+      await api.updateSettings({ fixedRoutes: updatedRoutes });
+      await refreshSettings();
+      showToast(t('admin.routeDeleted'));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete route');
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingSettings(true);
@@ -284,6 +428,16 @@ export const AdminDashboard: React.FC = () => {
       (d.phone && d.phone.toLowerCase().includes(q)) ||
       (d.carDetails?.model && d.carDetails.model.toLowerCase().includes(q)) ||
       (d.carDetails?.plate && d.carDetails.plate.toLowerCase().includes(q))
+    );
+  });
+
+  const filteredRoutes = (settings?.fixedRoutes || []).filter((r) => {
+    const q = routeSearch.toLowerCase();
+    if (!q) return true;
+    return (
+      r.pickupName.toLowerCase().includes(q) ||
+      r.destinationName.toLowerCase().includes(q) ||
+      String(r.price).includes(q)
     );
   });
 
@@ -319,7 +473,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex items-center gap-1.5 bg-slate-800/80 p-1.5 rounded-2xl border border-slate-700/80">
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/80 p-1.5 rounded-2xl border border-slate-700/80">
           <button
             onClick={() => setActiveTab('overview')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -349,6 +503,20 @@ export const AdminDashboard: React.FC = () => {
             }`}
           >
             {t('admin.driverManagement')} ({drivers.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pricing')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'pricing'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <DollarSign className="w-3.5 h-3.5" />
+            <span>{t('admin.routePricing')}</span>
+            <span className="text-[10px] bg-slate-900/60 px-1.5 py-0.2 rounded-full font-mono">
+              {(settings?.fixedRoutes || []).length}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('settings')}
@@ -723,7 +891,153 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 4: SYSTEM & GOOGLE MAPS CONFIGURATION */}
+      {/* TAB 4: FIXED ROUTE PRICING */}
+      {activeTab === 'pricing' && (
+        <div className="space-y-6">
+          {/* Toast Message */}
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-bounce">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{toastMessage}</span>
+            </div>
+          )}
+
+          <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-6 text-left rtl:text-right">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-amber-400" />
+                  <span>{t('admin.routePricing')}</span>
+                  <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono">
+                    {filteredRoutes.length} / {(settings?.fixedRoutes || []).length}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  {t('admin.routePricingDesc')}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3 rtl:right-3 top-3" />
+                  <input
+                    type="text"
+                    value={routeSearch}
+                    onChange={(e) => setRouteSearch(e.target.value)}
+                    placeholder={t('admin.searchRoutes')}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 text-left rtl:text-right"
+                  />
+                </div>
+
+                <button
+                  onClick={handleOpenAddRoute}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t('admin.addRoutePrice')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Routes Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredRoutes.map((route) => (
+                <div
+                  key={route.id}
+                  className={`bg-slate-800/80 rounded-2xl p-5 border shadow-lg space-y-4 flex flex-col justify-between text-left rtl:text-right transition-colors ${
+                    route.isActive ? 'border-slate-700/80 hover:border-slate-600' : 'border-slate-800 opacity-60'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <DollarSign className="w-4 h-4" />
+                        </span>
+                        <span className="text-xs font-bold text-white font-mono">
+                          #{route.id.slice(-6)}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleToggleRouteActive(route)}
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition-all cursor-pointer ${
+                          route.isActive
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30'
+                            : 'bg-slate-700 text-slate-400 border-slate-600 hover:bg-slate-600'
+                        }`}
+                      >
+                        {route.isActive ? t('admin.activeRoute') : t('admin.inactiveRoute')}
+                      </button>
+                    </div>
+
+                    {/* Route Locations */}
+                    <div className="bg-slate-900/70 p-3.5 rounded-xl border border-slate-700/60 space-y-2 text-xs">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-[10px] text-slate-400 uppercase font-bold">{t('admin.pickupPoint')}</div>
+                          <div className="text-slate-200 font-semibold">{route.pickupName}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-center my-1">
+                        <div className="flex items-center gap-1 text-[10px] text-amber-400/80 font-bold bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700/60">
+                          <ArrowLeftRight className="w-3 h-3 text-amber-400" />
+                          <span>{route.isBidirectional ? t('admin.bidirectional') : '→'}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-[10px] text-slate-400 uppercase font-bold">{t('admin.destinationPoint')}</div>
+                          <div className="text-slate-200 font-semibold">{route.destinationName}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-700 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400 font-medium">{t('admin.fixedPrice')}:</span>
+                      <div className="text-lg font-black text-amber-400 font-mono">
+                        {route.price} <span className="text-xs font-bold text-slate-400">{currencyLabel}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => handleOpenEditRoute(route)}
+                        className="py-1.5 px-3 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>{t('admin.editRoutePrice')}</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRoute(route)}
+                        className="py-1.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{t('admin.deleteRoutePrice')}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {filteredRoutes.length === 0 && (
+              <div className="text-center py-12 text-slate-400 text-xs">
+                {i18n.language === 'ar' ? 'لا توجد مسارات مطابقة لبحثك' : 'No routes matching your search.'}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: SYSTEM & GOOGLE MAPS CONFIGURATION */}
       {activeTab === 'settings' && (
         <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl max-w-2xl mx-auto space-y-6 text-left rtl:text-right">
           <div className="border-b border-slate-800 pb-4">
@@ -1131,6 +1445,269 @@ export const AdminDashboard: React.FC = () => {
                 >
                   <Save className="w-4 h-4" />
                   <span>{isProcessingDriver ? t('common.loading') : t('admin.saveDriver')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD FIXED ROUTE PRICE */}
+      {showAddRouteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 text-left rtl:text-right my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-amber-400" />
+                  <span>{t('admin.addRoutePrice')}</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">{t('admin.addRoutePriceDesc')}</p>
+              </div>
+              <button
+                onClick={() => setShowAddRouteModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRoute} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t('admin.pickupPoint')}</span>
+                </label>
+                <input
+                  type="text"
+                  list="pickup-zones-list"
+                  value={addPickupName}
+                  onChange={(e) => setAddPickupName(e.target.value)}
+                  placeholder="e.g. Cairo Airport Terminal 3"
+                  required
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 text-left rtl:text-right"
+                />
+                <datalist id="pickup-zones-list">
+                  {PRESET_ZONE_LOCATIONS.map((loc, idx) => (
+                    <option key={idx} value={loc} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{t('admin.destinationPoint')}</span>
+                </label>
+                <input
+                  type="text"
+                  list="dest-zones-list"
+                  value={addDestName}
+                  onChange={(e) => setAddDestName(e.target.value)}
+                  placeholder="e.g. Tahrir Square (Downtown)"
+                  required
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 text-left rtl:text-right"
+                />
+                <datalist id="dest-zones-list">
+                  {PRESET_ZONE_LOCATIONS.map((loc, idx) => (
+                    <option key={idx} value={loc} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{t('admin.fixedPrice')} ({currencyLabel})</span>
+                </label>
+                <input
+                  type="number"
+                  step="5"
+                  min="1"
+                  value={addRoutePrice}
+                  onChange={(e) => setAddRoutePrice(e.target.value)}
+                  placeholder="180"
+                  required
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500 text-left rtl:text-right"
+                />
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="addRouteBidirectional"
+                    checked={addIsBidirectional}
+                    onChange={(e) => setAddIsBidirectional(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 bg-slate-800 border-slate-700 focus:ring-amber-500"
+                  />
+                  <label htmlFor="addRouteBidirectional" className="text-xs text-slate-300 cursor-pointer">
+                    {t('admin.bidirectional')}
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {t('admin.bidirectionalDesc')}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="addRouteActive"
+                  checked={addRouteIsActive}
+                  onChange={(e) => setAddRouteIsActive(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-500 bg-slate-800 border-slate-700 focus:ring-emerald-500"
+                />
+                <label htmlFor="addRouteActive" className="text-xs text-slate-300 cursor-pointer">
+                  {t('admin.activeRoute')}
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRouteModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingRoute}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isProcessingRoute ? t('common.loading') : t('admin.createRoutePrice')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT FIXED ROUTE PRICE */}
+      {showEditRouteModal && selectedRoute && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 text-left rtl:text-right my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Edit2 className="w-5 h-5 text-blue-400" />
+                  <span>{t('admin.editRoutePrice')}</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">{t('admin.editRoutePriceDesc')}</p>
+              </div>
+              <button
+                onClick={() => setShowEditRouteModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateRoute} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t('admin.pickupPoint')}</span>
+                </label>
+                <input
+                  type="text"
+                  list="edit-pickup-zones-list"
+                  value={editPickupName}
+                  onChange={(e) => setEditPickupName(e.target.value)}
+                  required
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 text-left rtl:text-right"
+                />
+                <datalist id="edit-pickup-zones-list">
+                  {PRESET_ZONE_LOCATIONS.map((loc, idx) => (
+                    <option key={idx} value={loc} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{t('admin.destinationPoint')}</span>
+                </label>
+                <input
+                  type="text"
+                  list="edit-dest-zones-list"
+                  value={editDestName}
+                  onChange={(e) => setEditDestName(e.target.value)}
+                  required
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 text-left rtl:text-right"
+                />
+                <datalist id="edit-dest-zones-list">
+                  {PRESET_ZONE_LOCATIONS.map((loc, idx) => (
+                    <option key={idx} value={loc} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{t('admin.fixedPrice')} ({currencyLabel})</span>
+                </label>
+                <input
+                  type="number"
+                  step="5"
+                  min="1"
+                  value={editRoutePrice}
+                  onChange={(e) => setEditRoutePrice(e.target.value)}
+                  required
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500 text-left rtl:text-right"
+                />
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="editRouteBidirectional"
+                    checked={editIsBidirectional}
+                    onChange={(e) => setEditIsBidirectional(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-500 bg-slate-800 border-slate-700 focus:ring-blue-500"
+                  />
+                  <label htmlFor="editRouteBidirectional" className="text-xs text-slate-300 cursor-pointer">
+                    {t('admin.bidirectional')}
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {t('admin.bidirectionalDesc')}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="editRouteActive"
+                  checked={editRouteIsActive}
+                  onChange={(e) => setEditRouteIsActive(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-500 bg-slate-800 border-slate-700 focus:ring-emerald-500"
+                />
+                <label htmlFor="editRouteActive" className="text-xs text-slate-300 cursor-pointer">
+                  {t('admin.activeRoute')}
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowEditRouteModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingRoute}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 text-white font-black text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isProcessingRoute ? t('common.loading') : t('admin.saveRoutePrice')}</span>
                 </button>
               </div>
             </form>

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
-import { Trip, LocationCoords } from '../../types';
+import { Trip, LocationCoords, FixedRoutePrice } from '../../types';
 import confetti from 'canvas-confetti';
 import {
   MapPin,
@@ -52,6 +52,35 @@ export const CustomerDashboard: React.FC = () => {
   const currencyLabel = t('app.egp');
   const distanceUnit = t('app.km');
 
+  // Check if current pickup & destination match any active fixed route
+  const findMatchingFixedRoute = (pickup: string, dest: string, routes?: FixedRoutePrice[]): FixedRoutePrice | null => {
+    if (!routes || routes.length === 0 || !pickup || !dest) return null;
+    const pLower = pickup.toLowerCase();
+    const dLower = dest.toLowerCase();
+
+    for (const r of routes) {
+      if (!r.isActive) continue;
+      const rPLower = r.pickupName.toLowerCase();
+      const rDLower = r.destinationName.toLowerCase();
+
+      // Check direct match
+      const directMatch =
+        (pLower.includes(rPLower) || rPLower.includes(pLower)) &&
+        (dLower.includes(rDLower) || rDLower.includes(dLower));
+
+      if (directMatch) return r;
+
+      // Check reverse match if bidirectional
+      if (r.isBidirectional) {
+        const reverseMatch =
+          (pLower.includes(rDLower) || rDLower.includes(pLower)) &&
+          (dLower.includes(rPLower) || rPLower.includes(dLower));
+        if (reverseMatch) return r;
+      }
+    }
+    return null;
+  };
+
   // Calculate distance & estimated fare
   const calculateDistance = (p1: LocationCoords, p2: LocationCoords): number => {
     const R = 6371;
@@ -67,10 +96,11 @@ export const CustomerDashboard: React.FC = () => {
     return parseFloat((R * c).toFixed(1));
   };
 
+  const matchedRoute = findMatchingFixedRoute(pickupAddress, destAddress, settings?.fixedRoutes);
   const distanceKm = Math.max(1.5, calculateDistance(pickupCoords, destCoords));
   const baseFare = settings?.baseFare || 20;
   const perKm = settings?.perKmRate || 6.5;
-  const estimatedFare = Math.round(baseFare + distanceKm * perKm);
+  const estimatedFare = matchedRoute ? matchedRoute.price : Math.round(baseFare + distanceKm * perKm);
 
   // Load Active Trip and History
   const loadData = async () => {
@@ -502,17 +532,33 @@ export const CustomerDashboard: React.FC = () => {
               />
             </div>
 
-            <div className="bg-slate-800/90 rounded-2xl p-4 border border-slate-700 flex items-center justify-between text-xs">
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.distance')}</div>
-                <div className="text-sm font-bold text-slate-200 font-mono">{distanceKm} {distanceUnit}</div>
-              </div>
-              <div className="text-right rtl:text-left">
-                <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.estCost')}</div>
-                <div className="text-lg font-black text-emerald-400 font-mono">
-                  {estimatedFare} <span className="text-xs font-sans">{currencyLabel}</span>
+            <div className="bg-slate-800/90 rounded-2xl p-4 border border-slate-700 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.distance')}</div>
+                  <div className="text-sm font-bold text-slate-200 font-mono">{distanceKm} {distanceUnit}</div>
+                </div>
+                <div className="text-right rtl:text-left">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-end rtl:justify-start gap-1">
+                    <span>{t('customer.estCost')}</span>
+                    {matchedRoute && (
+                      <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-bold">
+                        {t('admin.fixedPriceBadge')}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`text-lg font-black font-mono ${matchedRoute ? 'text-purple-400' : 'text-emerald-400'}`}>
+                    {estimatedFare} <span className="text-xs font-sans text-slate-400">{currencyLabel}</span>
+                  </div>
                 </div>
               </div>
+
+              {matchedRoute && (
+                <div className="text-[11px] text-purple-300/90 bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/30 flex items-center gap-2 animate-fadeIn">
+                  <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                  <span>{t('admin.fixedPriceApplied')}: <b>{matchedRoute.pickupName} ➔ {matchedRoute.destinationName}</b></span>
+                </div>
+              )}
             </div>
 
             <button

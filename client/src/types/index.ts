@@ -55,12 +55,25 @@ export interface Trip {
   customerRating?: number | null;
 }
 
+export interface FixedRoutePrice {
+  id: string;
+  pickupName: string;
+  pickupAddress?: string;
+  destinationName: string;
+  destinationAddress?: string;
+  price: number;
+  isActive: boolean;
+  isBidirectional?: boolean;
+  createdAt?: string;
+}
+
 export interface SystemSettings {
   googleMapsApiKey: string;
   baseFare: number;
   perKmRate: number;
   currency: string;
   companyName: string;
+  fixedRoutes?: FixedRoutePrice[];
 }
 
 export interface AdminMetrics {

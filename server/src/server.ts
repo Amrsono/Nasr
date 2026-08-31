@@ -641,13 +641,14 @@ app.get('/api/settings', (_req, res) => {
 });
 
 app.put('/api/settings', authenticate, requireRole('admin'), (req: AuthRequest, res) => {
-  const { googleMapsApiKey, baseFare, perKmRate, currency, companyName } = req.body;
+  const { googleMapsApiKey, baseFare, perKmRate, currency, companyName, fixedRoutes } = req.body;
   const updated = db.updateSettings({
     ...(googleMapsApiKey !== undefined && { googleMapsApiKey }),
     ...(baseFare !== undefined && { baseFare: parseFloat(baseFare) }),
     ...(perKmRate !== undefined && { perKmRate: parseFloat(perKmRate) }),
     ...(currency && { currency }),
     ...(companyName && { companyName }),
+    ...(fixedRoutes !== undefined && { fixedRoutes }),
   });
   res.json(updated);
 });
