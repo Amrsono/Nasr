@@ -1522,8 +1522,8 @@ export const AdminDashboard: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  step="5"
-                  min="1"
+                  step="any"
+                  min="0"
                   value={addRoutePrice}
                   onChange={(e) => setAddRoutePrice(e.target.value)}
                   placeholder="180"
@@ -1653,8 +1653,8 @@ export const AdminDashboard: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  step="5"
-                  min="1"
+                  step="any"
+                  min="0"
                   value={editRoutePrice}
                   onChange={(e) => setEditRoutePrice(e.target.value)}
                   required
