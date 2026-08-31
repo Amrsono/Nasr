@@ -81,7 +81,7 @@
     "driverAssigned": "Driver Accepted! En route to pickup",
     "driverArrived": "Driver Has Arrived!",
     "driverArrivedDesc": "Your driver has reached the pickup location and is waiting for you. Please head out to meet him.",
-    "pickedUp": "Trip in progress. You are on the way!",
+    "pickedUp": "Ride started, heading to destination!",
     "completed": "Trip Completed! You arrived at your destination.",
     "cancelRide": "Cancel Request",
     "rateDriver": "Rate Your Trip",
