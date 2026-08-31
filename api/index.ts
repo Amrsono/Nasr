@@ -287,13 +287,15 @@ const requireRole = (...roles: UserRole[]) => {
   };
 };
 
+const router = express.Router();
+
 // Health Check
-app.get('/api/health', (_req, res) => {
+router.get('/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString(), app: 'Nasr Ride Vercel Serverless' });
 });
 
 // Demo accounts endpoint
-app.get('/api/auth/demo-users', (_req, res) => {
+router.get('/auth/demo-users', (_req, res) => {
   const users = db.getUsers().map((u) => ({
     id: u.id,
     name: u.name,
@@ -307,7 +309,7 @@ app.get('/api/auth/demo-users', (_req, res) => {
 });
 
 // Login
-app.post('/api/auth/login', (req, res) => {
+router.post('/auth/login', (req, res) => {
   const { email, password } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });
@@ -345,7 +347,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Register
-app.post('/api/auth/register', (req, res) => {
+router.post('/auth/register', (req, res) => {
   const { name, email, password, role, phone, carDetails } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -384,14 +386,14 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // Current User Profile
-app.get('/api/auth/me', authenticate, (req: AuthRequest, res) => {
+router.get('/auth/me', authenticate, (req: AuthRequest, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
   const { password: _, ...userWithoutPw } = req.user;
   res.json(userWithoutPw);
 });
 
 // Update Profile
-app.put('/api/auth/me', authenticate, (req: AuthRequest, res) => {
+router.put('/auth/me', authenticate, (req: AuthRequest, res) => {
   const { name, phone, avatar, carDetails, isOnline, currentLocation } = req.body;
   
   const updated = db.updateUser(req.user!.id, {
@@ -409,7 +411,7 @@ app.put('/api/auth/me', authenticate, (req: AuthRequest, res) => {
 });
 
 // List Trips
-app.get('/api/trips', authenticate, (req: AuthRequest, res) => {
+router.get('/trips', authenticate, (req: AuthRequest, res) => {
   const user = req.user!;
   const allTrips = db.getTrips();
 
@@ -425,13 +427,13 @@ app.get('/api/trips', authenticate, (req: AuthRequest, res) => {
 });
 
 // Driver Queue
-app.get('/api/trips/queue', authenticate, requireRole('driver', 'admin'), (_req: AuthRequest, res) => {
+router.get('/trips/queue', authenticate, requireRole('driver', 'admin'), (_req: AuthRequest, res) => {
   const queuedTrips = db.getTrips().filter((t) => t.status === 'REQUESTED');
   res.json(queuedTrips);
 });
 
 // Active trip
-app.get('/api/trips/active', authenticate, (req: AuthRequest, res) => {
+router.get('/trips/active', authenticate, (req: AuthRequest, res) => {
   const user = req.user!;
   const activeStatuses: TripStatus[] = ['REQUESTED', 'ACCEPTED', 'PICKED_UP'];
 
@@ -446,14 +448,14 @@ app.get('/api/trips/active', authenticate, (req: AuthRequest, res) => {
 });
 
 // Single Trip
-app.get('/api/trips/:id', authenticate, (req: AuthRequest, res) => {
+router.get('/trips/:id', authenticate, (req: AuthRequest, res) => {
   const trip = db.getTripById(req.params.id);
   if (!trip) return res.status(404).json({ error: 'Trip not found' });
   res.json(trip);
 });
 
 // Create Trip
-app.post('/api/trips', authenticate, (req: AuthRequest, res) => {
+router.post('/trips', authenticate, (req: AuthRequest, res) => {
   const user = req.user!;
   const { pickupAddress, pickupCoords, destinationAddress, destinationCoords, distanceKm, notes } = req.body;
 
@@ -497,7 +499,7 @@ app.post('/api/trips', authenticate, (req: AuthRequest, res) => {
 });
 
 // Accept Trip
-app.post('/api/trips/:id/accept', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
+router.post('/trips/:id/accept', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
   const driver = req.user!;
   const trip = db.getTripById(req.params.id);
 
@@ -523,7 +525,7 @@ app.post('/api/trips/:id/accept', authenticate, requireRole('driver'), (req: Aut
 });
 
 // Flag Picked Up
-app.post('/api/trips/:id/pickup', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
+router.post('/trips/:id/pickup', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
   const driver = req.user!;
   const trip = db.getTripById(req.params.id);
 
@@ -539,7 +541,7 @@ app.post('/api/trips/:id/pickup', authenticate, requireRole('driver'), (req: Aut
 });
 
 // Flag Dropped Off
-app.post('/api/trips/:id/dropoff', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
+router.post('/trips/:id/dropoff', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
   const driver = req.user!;
   const trip = db.getTripById(req.params.id);
   const { amountPaid } = req.body;
@@ -568,7 +570,7 @@ app.post('/api/trips/:id/dropoff', authenticate, requireRole('driver'), (req: Au
 });
 
 // Cancel Trip
-app.post('/api/trips/:id/cancel', authenticate, (req: AuthRequest, res) => {
+router.post('/trips/:id/cancel', authenticate, (req: AuthRequest, res) => {
   const user = req.user!;
   const trip = db.getTripById(req.params.id);
 
@@ -586,7 +588,7 @@ app.post('/api/trips/:id/cancel', authenticate, (req: AuthRequest, res) => {
 });
 
 // Rate Trip
-app.post('/api/trips/:id/rate', authenticate, (req: AuthRequest, res) => {
+router.post('/trips/:id/rate', authenticate, (req: AuthRequest, res) => {
   const user = req.user!;
   const trip = db.getTripById(req.params.id);
   const { rating } = req.body;
@@ -611,7 +613,7 @@ app.post('/api/trips/:id/rate', authenticate, (req: AuthRequest, res) => {
 });
 
 // Admin Metrics
-app.get('/api/admin/metrics', authenticate, requireRole('admin'), (_req: AuthRequest, res) => {
+router.get('/admin/metrics', authenticate, requireRole('admin'), (_req: AuthRequest, res) => {
   const allTrips = db.getTrips();
   const allUsers = db.getUsers();
   const drivers = allUsers.filter((u) => u.role === 'driver');
@@ -641,7 +643,7 @@ app.get('/api/admin/metrics', authenticate, requireRole('admin'), (_req: AuthReq
 });
 
 // Admin Drivers
-app.get('/api/admin/drivers', authenticate, requireRole('admin'), (_req: AuthRequest, res) => {
+router.get('/admin/drivers', authenticate, requireRole('admin'), (_req: AuthRequest, res) => {
   const drivers = db.getUsers().filter((u) => u.role === 'driver');
   const allTrips = db.getTrips();
 
@@ -662,18 +664,22 @@ app.get('/api/admin/drivers', authenticate, requireRole('admin'), (_req: AuthReq
 });
 
 // Settings
-app.get('/api/settings', (_req, res) => {
+router.get('/settings', (_req, res) => {
   res.json(db.getSettings());
 });
 
-app.put('/api/settings', authenticate, requireRole('admin'), (req: AuthRequest, res) => {
+router.put('/settings', authenticate, requireRole('admin'), (req: AuthRequest, res) => {
   const updated = db.updateSettings(req.body);
   res.json(updated);
 });
 
-app.post('/api/admin/reset', (_req, res) => {
+router.post('/admin/reset', (_req, res) => {
   db.reset();
   res.json({ success: true, message: 'Database reset to clean state' });
 });
+
+// Mount router on both '/api' and '/'
+app.use('/api', router);
+app.use('/', router);
 
 export default app;
