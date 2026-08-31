@@ -1,0 +1,231 @@
+{
+  "settings": {
+    "googleMapsApiKey": "",
+    "baseFare": 20,
+    "perKmRate": 6.5,
+    "currency": "EGP",
+    "companyName": "Nasr Ride"
+  },
+  "users": [
+    {
+      "id": "user_admin",
+      "name": "Owner Admin",
+      "email": "admin@nasr.com",
+      "password": "$2b$10$svpSsiD2hOzAwqADBiNAIekS4tyGaKhDh25hvuKF0RKG.aq.kajVC",
+      "role": "admin",
+      "phone": "+20 100 000 0001",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "createdAt": "2026-08-01T16:04:41.281Z"
+    },
+    {
+      "id": "user_driver1",
+      "name": "Driver 1 - Ahmed",
+      "email": "driver1@nasr.com",
+      "password": "$2b$10$NSrPWlD4hWbGrcWggT4PLe89IgOudiBzaXZXrA3tY9D2wDoaO0l.S",
+      "role": "driver",
+      "phone": "+20 101 111 2221",
+      "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      "carDetails": {
+        "model": "Toyota Corolla (2022)",
+        "plate": "1234 ABC",
+        "color": "White"
+      },
+      "isOnline": true,
+      "currentLocation": {
+        "lat": 30.0444,
+        "lng": 31.2357
+      },
+      "totalTrips": 43,
+      "totalEarnings": 3942,
+      "rating": 4.9,
+      "createdAt": "2026-08-06T16:04:41.349Z"
+    },
+    {
+      "id": "user_driver2",
+      "name": "Driver 2 - Mahmoud",
+      "email": "driver2@nasr.com",
+      "password": "$2b$10$EyW5EVemR17UUYhMUDFd/.R0jmtXcOXKrSCwk8cbRK1ywoDI4z7wm",
+      "role": "driver",
+      "phone": "+20 102 222 3332",
+      "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+      "carDetails": {
+        "model": "Hyundai Elantra (2021)",
+        "plate": "5678 XYZ",
+        "color": "Silver"
+      },
+      "isOnline": true,
+      "currentLocation": {
+        "lat": 30.0626,
+        "lng": 31.2497
+      },
+      "totalTrips": 35,
+      "totalEarnings": 3120,
+      "rating": 4.8,
+      "createdAt": "2026-08-11T16:04:41.415Z"
+    },
+    {
+      "id": "user_driver3",
+      "name": "Driver 3 - Tarek",
+      "email": "driver3@nasr.com",
+      "password": "$2b$10$2AEWKnm0yovWNV/d5qprvOijE2ptPis.6vWyJ/pTVQrDgOft7Os/e",
+      "role": "driver",
+      "phone": "+20 103 333 4443",
+      "avatar": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80",
+      "carDetails": {
+        "model": "Nissan Sunny (2023)",
+        "plate": "9012 EFG",
+        "color": "Black"
+      },
+      "isOnline": true,
+      "currentLocation": {
+        "lat": 30.0131,
+        "lng": 31.2089
+      },
+      "totalTrips": 28,
+      "totalEarnings": 2450,
+      "rating": 4.7,
+      "createdAt": "2026-08-16T16:04:41.483Z"
+    },
+    {
+      "id": "user_driver4",
+      "name": "Driver 4 - Youssef",
+      "email": "driver4@nasr.com",
+      "password": "$2b$10$3NYqF1034jWEmdngdX7iwu33qHnGKmlTwSnDwXOAEULhgccEcCt8K",
+      "role": "driver",
+      "phone": "+20 104 444 5554",
+      "avatar": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80",
+      "carDetails": {
+        "model": "Kia Cerato (2020)",
+        "plate": "3456 JKL",
+        "color": "Blue"
+      },
+      "isOnline": true,
+      "currentLocation": {
+        "lat": 30.0888,
+        "lng": 31.2988
+      },
+      "totalTrips": 19,
+      "totalEarnings": 1680,
+      "rating": 4.9,
+      "createdAt": "2026-08-21T16:04:41.550Z"
+    },
+    {
+      "id": "user_amrsono",
+      "name": "Amrsono",
+      "email": "amrsono@nasr.com",
+      "password": "$2b$10$Gzs1oeuCwEVVao2wTRC2u.vkP/dviKDD7xKC2hdyS1f5m1lAiUPpK",
+      "role": "customer",
+      "phone": "+20 100 123 4567",
+      "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
+      "totalTrips": 8,
+      "createdAt": "2026-08-26T16:04:41.617Z"
+    },
+    {
+      "id": "user_7465b3c0",
+      "name": "كريم الشناوي",
+      "email": "karim@nasr.com",
+      "password": "$2b$10$udbulfWCJVxTwCKhSEStre.334Bqv.BK36cyruBb4AxHJfantSxcq",
+      "role": "customer",
+      "phone": "+20 101 987 6543",
+      "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=كريم الشناوي",
+      "totalTrips": 1,
+      "totalEarnings": 0,
+      "rating": 5,
+      "createdAt": "2026-08-31T16:05:04.245Z"
+    }
+  ],
+  "trips": [
+    {
+      "id": "trip_demo_1",
+      "customerId": "user_amrsono",
+      "customerName": "Amrsono",
+      "customerPhone": "+20 100 123 4567",
+      "driverId": "user_driver1",
+      "driverName": "Driver 1 - Ahmed",
+      "driverPhone": "+20 101 111 2221",
+      "driverCar": "Toyota Corolla (2022) - 1234 ABC",
+      "pickupAddress": "Tahrir Square, Downtown Cairo",
+      "pickupCoords": {
+        "lat": 30.0444,
+        "lng": 31.2357
+      },
+      "destinationAddress": "Cairo International Airport, Terminal 3",
+      "destinationCoords": {
+        "lat": 30.1219,
+        "lng": 31.4056
+      },
+      "distanceKm": 21.4,
+      "estimatedFare": 160,
+      "finalFare": 165,
+      "currency": "EGP",
+      "status": "DROPPED_OFF",
+      "createdAt": "2026-08-29T16:04:41.617Z",
+      "acceptedAt": "2026-08-29T16:06:41.617Z",
+      "pickedUpAt": "2026-08-29T16:14:41.617Z",
+      "droppedOffAt": "2026-08-29T16:54:41.617Z",
+      "customerRating": 5
+    },
+    {
+      "id": "trip_demo_2",
+      "customerId": "user_amrsono",
+      "customerName": "Amrsono",
+      "customerPhone": "+20 100 123 4567",
+      "driverId": "user_driver2",
+      "driverName": "Driver 2 - Mahmoud",
+      "driverPhone": "+20 102 222 3332",
+      "driverCar": "Hyundai Elantra (2021) - 5678 XYZ",
+      "pickupAddress": "Citystars Mall, Nasr City",
+      "pickupCoords": {
+        "lat": 30.0735,
+        "lng": 31.3456
+      },
+      "destinationAddress": "Zamalek, Gezira Island",
+      "destinationCoords": {
+        "lat": 30.0617,
+        "lng": 31.2195
+      },
+      "distanceKm": 14.8,
+      "estimatedFare": 115,
+      "finalFare": 120,
+      "currency": "EGP",
+      "status": "DROPPED_OFF",
+      "createdAt": "2026-08-30T16:04:41.617Z",
+      "acceptedAt": "2026-08-30T16:06:11.617Z",
+      "pickedUpAt": "2026-08-30T16:12:41.617Z",
+      "droppedOffAt": "2026-08-30T16:41:21.617Z",
+      "customerRating": 5
+    },
+    {
+      "id": "trip_mthfj8c9_2ht2",
+      "customerId": "user_7465b3c0",
+      "customerName": "كريم الشناوي",
+      "customerPhone": "+20 101 987 6543",
+      "driverId": "user_driver1",
+      "driverName": "Driver 1 - Ahmed",
+      "driverPhone": "+20 101 111 2221",
+      "driverCar": "Toyota Corolla (2022) (White) - 1234 ABC",
+      "pickupAddress": "ميدان التحرير، وسط البلد، القاهرة",
+      "pickupCoords": {
+        "lat": 30.0444,
+        "lng": 31.2357
+      },
+      "destinationAddress": "سيتي ستارز مول، شارع عمر بن الخطاب، مدينة نصر",
+      "destinationCoords": {
+        "lat": 30.0735,
+        "lng": 31.3456
+      },
+      "distanceKm": 11.1,
+      "estimatedFare": 92,
+      "finalFare": 92,
+      "currency": "EGP",
+      "status": "DROPPED_OFF",
+      "notes": "أنا بانتظارك أمام البوابة الرئيسية ومعي حقيبتان. برجاء الاتصال عند الوصول.",
+      "createdAt": "2026-08-31T16:05:14.361Z",
+      "acceptedAt": "2026-08-31T16:05:26.205Z",
+      "pickedUpAt": "2026-08-31T16:05:29.759Z",
+      "droppedOffAt": "2026-08-31T16:05:35.936Z",
+      "cancelledAt": null,
+      "customerRating": null
+    }
+  ]
+}
