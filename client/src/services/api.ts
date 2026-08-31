@@ -614,6 +614,122 @@ export const api = {
     }));
   },
 
+  async createDriver(data: {
+    name: string;
+    email: string;
+    password?: string;
+    phone?: string;
+    avatar?: string;
+    carDetails?: { model: string; plate: string; color: string };
+    isOnline?: boolean;
+  }): Promise<User> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/drivers`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
+        return res.json();
+      }
+    } catch {}
+
+    const db = getLocalDB();
+    const existing = db.users.find((u) => u.email.toLowerCase() === data.email.toLowerCase());
+    if (existing) throw new Error('A user with this email already exists');
+
+    const newDriver: User = {
+      id: `user_driver_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      name: data.name.trim(),
+      email: data.email.trim().toLowerCase(),
+      role: 'driver',
+      phone: data.phone?.trim() || '+20 100 000 0000',
+      avatar: data.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(data.name.trim())}`,
+      carDetails: {
+        model: data.carDetails?.model?.trim() || 'Toyota Corolla',
+        plate: data.carDetails?.plate?.trim() || '1234 ABC',
+        color: data.carDetails?.color?.trim() || 'White',
+      },
+      isOnline: data.isOnline !== undefined ? data.isOnline : true,
+      currentLocation: { lat: 30.0444, lng: 31.2357 },
+      totalTrips: 0,
+      totalEarnings: 0,
+      rating: 5.0,
+      createdAt: new Date().toISOString(),
+    };
+
+    db.users.push(newDriver);
+    saveLocalDB(db);
+    return newDriver;
+  },
+
+  async updateDriver(
+    id: string,
+    data: {
+      name?: string;
+      email?: string;
+      password?: string;
+      phone?: string;
+      avatar?: string;
+      carDetails?: { model: string; plate: string; color: string };
+      isOnline?: boolean;
+    }
+  ): Promise<User> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/drivers/${id}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
+        return res.json();
+      }
+    } catch {}
+
+    const db = getLocalDB();
+    const idx = db.users.findIndex((u) => u.id === id);
+    if (idx === -1) throw new Error('Driver not found');
+
+    db.users[idx] = {
+      ...db.users[idx],
+      ...(data.name && { name: data.name.trim() }),
+      ...(data.email && { email: data.email.trim().toLowerCase() }),
+      ...(data.phone !== undefined && { phone: data.phone.trim() }),
+      ...(data.avatar !== undefined && { avatar: data.avatar.trim() }),
+      ...(data.isOnline !== undefined && { isOnline: data.isOnline }),
+      ...(data.carDetails && {
+        carDetails: {
+          model: data.carDetails.model?.trim() || db.users[idx].carDetails?.model || 'Sedan',
+          plate: data.carDetails.plate?.trim() || db.users[idx].carDetails?.plate || '1234 ABC',
+          color: data.carDetails.color?.trim() || db.users[idx].carDetails?.color || 'White',
+        },
+      }),
+    };
+
+    saveLocalDB(db);
+    return db.users[idx];
+  },
+
+  async deleteDriver(id: string): Promise<{ success: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE}/admin/drivers/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+      if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
+        return res.json();
+      }
+    } catch {}
+
+    const db = getLocalDB();
+    const idx = db.users.findIndex((u) => u.id === id);
+    if (idx !== -1) {
+      db.users.splice(idx, 1);
+      saveLocalDB(db);
+    }
+    return { success: true };
+  },
+
   // Settings
   async getSettings(): Promise<SystemSettings> {
     try {

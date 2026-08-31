@@ -16,7 +16,23 @@ import {
   Key,
   Save,
   Check,
+  UserPlus,
+  Edit2,
+  Trash2,
+  X,
+  Phone,
+  Mail,
+  CheckCircle2,
 } from 'lucide-react';
+
+const DRIVER_AVATARS = [
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+];
 
 export const AdminDashboard: React.FC = () => {
   const { settings, refreshSettings } = useAuth();
@@ -28,6 +44,36 @@ export const AdminDashboard: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'trips' | 'drivers' | 'settings'>('overview');
+
+  // Driver Fleet Management Modal States
+  const [driverSearch, setDriverSearch] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState<DriverWithStats | null>(null);
+  const [isProcessingDriver, setIsProcessingDriver] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Form states for Add Driver
+  const [addName, setAddName] = useState('');
+  const [addEmail, setAddEmail] = useState('');
+  const [addPassword, setAddPassword] = useState('driver123');
+  const [addPhone, setAddPhone] = useState('+20 100 000 0000');
+  const [addCarModel, setAddCarModel] = useState('Toyota Corolla');
+  const [addCarPlate, setAddCarPlate] = useState('1234 ABC');
+  const [addCarColor, setAddCarColor] = useState('White');
+  const [addAvatar, setAddAvatar] = useState(DRIVER_AVATARS[0]);
+  const [addIsOnline, setAddIsOnline] = useState(true);
+
+  // Form states for Edit Driver
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCarModel, setEditCarModel] = useState('');
+  const [editCarPlate, setEditCarPlate] = useState('');
+  const [editCarColor, setEditCarColor] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
+  const [editIsOnline, setEditIsOnline] = useState(true);
 
   // Settings State
   const [apiKeyInput, setApiKeyInput] = useState(settings?.googleMapsApiKey || '');
@@ -109,6 +155,107 @@ export const AdminDashboard: React.FC = () => {
     };
   }, []);
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleOpenAdd = () => {
+    setAddName('');
+    setAddEmail(`driver${drivers.length + 1}@nasr.com`);
+    setAddPassword('driver123');
+    setAddPhone('+20 100 ' + Math.floor(100 + Math.random() * 900) + ' ' + Math.floor(1000 + Math.random() * 9000));
+    setAddCarModel('Toyota Corolla');
+    setAddCarPlate(Math.floor(1000 + Math.random() * 9000) + ' ABC');
+    setAddCarColor('White');
+    setAddAvatar(DRIVER_AVATARS[Math.floor(Math.random() * DRIVER_AVATARS.length)]);
+    setAddIsOnline(true);
+    setShowAddModal(true);
+  };
+
+  const handleCreateDriver = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addName.trim() || !addEmail.trim()) return;
+    setIsProcessingDriver(true);
+    try {
+      await api.createDriver({
+        name: addName.trim(),
+        email: addEmail.trim(),
+        password: addPassword.trim() || 'driver123',
+        phone: addPhone.trim(),
+        avatar: addAvatar,
+        carDetails: {
+          model: addCarModel.trim(),
+          plate: addCarPlate.trim(),
+          color: addCarColor.trim(),
+        },
+        isOnline: addIsOnline,
+      });
+      setShowAddModal(false);
+      await loadAdminData();
+      showToast(t('admin.driverAdded'));
+    } catch (err: any) {
+      alert(err.message || (i18n.language === 'ar' ? 'فشل إضافة السائق' : 'Failed to add driver'));
+    } finally {
+      setIsProcessingDriver(false);
+    }
+  };
+
+  const handleOpenEdit = (driver: DriverWithStats) => {
+    setSelectedDriver(driver);
+    setEditName(driver.name);
+    setEditEmail(driver.email);
+    setEditPassword('');
+    setEditPhone(driver.phone || '');
+    setEditCarModel(driver.carDetails?.model || '');
+    setEditCarPlate(driver.carDetails?.plate || '');
+    setEditCarColor(driver.carDetails?.color || 'White');
+    setEditAvatar(driver.avatar || DRIVER_AVATARS[0]);
+    setEditIsOnline(driver.isOnline ?? true);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateDriver = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDriver) return;
+    setIsProcessingDriver(true);
+    try {
+      await api.updateDriver(selectedDriver.id, {
+        name: editName.trim(),
+        email: editEmail.trim(),
+        password: editPassword.trim() || undefined,
+        phone: editPhone.trim(),
+        avatar: editAvatar,
+        carDetails: {
+          model: editCarModel.trim(),
+          plate: editCarPlate.trim(),
+          color: editCarColor.trim(),
+        },
+        isOnline: editIsOnline,
+      });
+      setShowEditModal(false);
+      setSelectedDriver(null);
+      await loadAdminData();
+      showToast(t('admin.driverUpdated'));
+    } catch (err: any) {
+      alert(err.message || (i18n.language === 'ar' ? 'فشل تحديث بيانات السائق' : 'Failed to update driver'));
+    } finally {
+      setIsProcessingDriver(false);
+    }
+  };
+
+  const handleDeleteDriver = async (driver: DriverWithStats) => {
+    const confirmText = `${t('admin.deleteDriverConfirm')} (${driver.name})`;
+    if (!window.confirm(confirmText)) return;
+    try {
+      await api.deleteDriver(driver.id);
+      await loadAdminData();
+      showToast(t('admin.driverDeleted'));
+    } catch (err: any) {
+      alert(err.message || (i18n.language === 'ar' ? 'فشل حذف السائق' : 'Failed to delete driver'));
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingSettings(true);
@@ -127,6 +274,18 @@ export const AdminDashboard: React.FC = () => {
       setIsSavingSettings(false);
     }
   };
+
+  const filteredDrivers = drivers.filter((d) => {
+    const q = driverSearch.toLowerCase();
+    if (!q) return true;
+    return (
+      d.name.toLowerCase().includes(q) ||
+      d.email.toLowerCase().includes(q) ||
+      (d.phone && d.phone.toLowerCase().includes(q)) ||
+      (d.carDetails?.model && d.carDetails.model.toLowerCase().includes(q)) ||
+      (d.carDetails?.plate && d.carDetails.plate.toLowerCase().includes(q))
+    );
+  });
 
   const filteredTrips = trips.filter((trip) => {
     const matchesStatus = statusFilter === 'ALL' || trip.status === statusFilter;
@@ -404,17 +563,57 @@ export const AdminDashboard: React.FC = () => {
       {/* TAB 3: DRIVER MANAGEMENT */}
       {activeTab === 'drivers' && (
         <div className="space-y-6">
-          <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4 text-left rtl:text-right">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Car className="w-4 h-4 text-emerald-400" />
-              <span>{t('admin.driverManagement')}</span>
-            </h2>
+          {/* Toast Message */}
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-bounce">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{toastMessage}</span>
+            </div>
+          )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {drivers.map((driver) => (
+          <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-6 text-left rtl:text-right">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Car className="w-5 h-5 text-emerald-400" />
+                  <span>{t('admin.driverManagement')}</span>
+                  <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono">
+                    {filteredDrivers.length} / {drivers.length}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  {i18n.language === 'ar' ? 'إدارة أسطول السائقين، إضافة كباتن جدد، وتعديل بيانات وحالة المركبات' : 'Manage driver fleet, register new drivers, update vehicle details, and track performance.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3 rtl:right-3 top-3" />
+                  <input
+                    type="text"
+                    value={driverSearch}
+                    onChange={(e) => setDriverSearch(e.target.value)}
+                    placeholder={t('admin.searchDrivers')}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 text-left rtl:text-right"
+                  />
+                </div>
+
+                <button
+                  onClick={handleOpenAdd}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>{t('admin.addDriver')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Drivers Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredDrivers.map((driver) => (
                 <div
                   key={driver.id}
-                  className="bg-slate-800/80 rounded-2xl p-5 border border-slate-700/80 shadow-lg space-y-4 flex flex-col justify-between text-left rtl:text-right"
+                  className="bg-slate-800/80 rounded-2xl p-5 border border-slate-700/80 shadow-lg space-y-4 flex flex-col justify-between text-left rtl:text-right hover:border-slate-600 transition-colors"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -423,49 +622,103 @@ export const AdminDashboard: React.FC = () => {
                         alt={driver.name}
                         className="w-12 h-12 rounded-xl object-cover border border-slate-700 bg-slate-900"
                       />
-                      <span
-                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                          driver.isOnline
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                            : 'bg-slate-700 text-slate-400 border-slate-600'
-                        }`}
-                      >
-                        {driver.isOnline ? t('app.online') : t('app.offline')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {driver.activeTrip && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 animate-pulse">
+                            {t(`status.${driver.activeTrip.status}`)}
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                            driver.isOnline
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                              : 'bg-slate-700 text-slate-400 border-slate-600'
+                          }`}
+                        >
+                          {driver.isOnline ? t('app.online') : t('app.offline')}
+                        </span>
+                      </div>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-bold text-white">{getLocalizedDriverName(driver.name)}</h3>
-                      <p className="text-xs text-slate-400 font-mono">{driver.email}</p>
+                      <h3 className="text-sm font-bold text-white flex items-center justify-between">
+                        <span>{getLocalizedDriverName(driver.name)}</span>
+                      </h3>
+                      <div className="text-xs text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                        <Mail className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span className="truncate">{driver.email}</span>
+                      </div>
+                      {driver.phone && (
+                        <div className="text-xs text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                          <Phone className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span>{driver.phone}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 text-xs space-y-1">
-                      <div className="text-slate-300 font-semibold">{driver.carDetails?.model || 'Sedan'}</div>
-                      <div className="text-[11px] text-slate-400">
-                        {t('customer.plate')}: <b className="text-slate-200 font-mono">{driver.carDetails?.plate}</b> • {getLocalizedColor(driver.carDetails?.color)}
+                    <div className="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 text-xs space-y-1">
+                      <div className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <Car className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{driver.carDetails?.model || 'Standard Sedan'}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800">
+                        <span>{t('customer.plate')}: <b className="text-slate-200 font-mono">{driver.carDetails?.plate || '1234 ABC'}</b></span>
+                        <span className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300 border border-slate-700">
+                          {getLocalizedColor(driver.carDetails?.color)}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-700 space-y-2 text-xs">
-                    <div className="flex justify-between items-center text-slate-400">
-                      <span>{t('driver.totalTrips')}:</span>
-                      <b className="text-white font-mono">{driver.totalTrips || driver.completedTripsCount}</b>
+                  <div className="pt-3 border-t border-slate-700 space-y-3 text-xs">
+                    <div className="grid grid-cols-3 gap-1 text-center bg-slate-900/40 p-2 rounded-xl border border-slate-800">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold">{t('driver.totalTrips')}</div>
+                        <div className="text-xs font-bold text-white font-mono mt-0.5">
+                          {driver.totalTrips || driver.completedTripsCount}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold">{t('driver.todayEarnings')}</div>
+                        <div className="text-xs font-bold text-emerald-400 font-mono mt-0.5">
+                          {driver.totalEarnings || driver.totalEarned} {currencyLabel}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold">{t('driver.driverRating')}</div>
+                        <div className="text-xs font-bold text-amber-400 font-mono flex items-center justify-center gap-0.5 mt-0.5">
+                          <Star className="w-3 h-3 fill-amber-400" /> {driver.rating || 4.9}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center text-slate-400">
-                      <span>{t('driver.todayEarnings')}:</span>
-                      <b className="text-emerald-400 font-mono">{driver.totalEarnings || driver.totalEarned} {currencyLabel}</b>
-                    </div>
-                    <div className="flex justify-between items-center text-slate-400">
-                      <span>{t('driver.driverRating')}:</span>
-                      <span className="flex items-center gap-1 text-amber-400 font-bold font-mono">
-                        <Star className="w-3 h-3 fill-amber-400" /> {driver.rating || 4.9}
-                      </span>
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => handleOpenEdit(driver)}
+                        className="py-1.5 px-3 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>{t('admin.editDriver')}</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDriver(driver)}
+                        className="py-1.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{t('admin.deleteDriver')}</span>
+                      </button>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
+
+            {filteredDrivers.length === 0 && (
+              <div className="text-center py-12 text-slate-400 text-xs">
+                {i18n.language === 'ar' ? 'لا يوجد سائقين مطابقين لنتائج البحث' : 'No drivers matching your search.'}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -541,12 +794,347 @@ export const AdminDashboard: React.FC = () => {
             <button
               type="submit"
               disabled={isSavingSettings}
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Save className="w-4 h-4" />
               <span>{isSavingSettings ? t('common.loading') : t('admin.saveSettings')}</span>
             </button>
           </form>
+        </div>
+      )}
+
+      {/* MODAL: ADD NEW DRIVER */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 text-left rtl:text-right my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-emerald-400" />
+                  <span>{t('admin.addDriver')}</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">{t('admin.addDriverDesc')}</p>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDriver} className="space-y-4">
+              {/* Avatar Presets */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-300">{t('admin.driverAvatar')}</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DRIVER_AVATARS.map((av, idx) => (
+                    <img
+                      key={idx}
+                      src={av}
+                      alt={`Avatar ${idx + 1}`}
+                      onClick={() => setAddAvatar(av)}
+                      className={`w-10 h-10 rounded-xl object-cover cursor-pointer border-2 transition-all ${
+                        addAvatar === av ? 'border-emerald-500 scale-105 shadow-md shadow-emerald-500/30' : 'border-slate-700 opacity-60 hover:opacity-100'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverName')}</label>
+                  <input
+                    type="text"
+                    value={addName}
+                    onChange={(e) => setAddName(e.target.value)}
+                    placeholder="e.g. Captain Karim Taha"
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 text-left rtl:text-right"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverEmail')}</label>
+                  <input
+                    type="email"
+                    value={addEmail}
+                    onChange={(e) => setAddEmail(e.target.value)}
+                    placeholder="driver@nasr.com"
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 text-left"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverPassword')}</label>
+                  <input
+                    type="text"
+                    value={addPassword}
+                    onChange={(e) => setAddPassword(e.target.value)}
+                    placeholder="driver123"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 text-left"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverPhone')}</label>
+                  <input
+                    type="text"
+                    value={addPhone}
+                    onChange={(e) => setAddPhone(e.target.value)}
+                    placeholder="+20 100 000 0000"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 text-left rtl:text-right"
+                  />
+                </div>
+              </div>
+
+              {/* Vehicle Information Section */}
+              <div className="pt-3 border-t border-slate-800 space-y-3">
+                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5" />
+                  <span>{t('driver.vehicleInfo')}</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-300">{t('admin.driverCarModel')}</label>
+                    <input
+                      type="text"
+                      value={addCarModel}
+                      onChange={(e) => setAddCarModel(e.target.value)}
+                      placeholder="e.g. Toyota Corolla (2023)"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 text-left rtl:text-right"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-300">{t('admin.driverCarPlate')}</label>
+                    <input
+                      type="text"
+                      value={addCarPlate}
+                      onChange={(e) => setAddCarPlate(e.target.value)}
+                      placeholder="1234 ABC"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 text-left rtl:text-right"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-300">{t('admin.driverCarColor')}</label>
+                    <select
+                      value={addCarColor}
+                      onChange={(e) => setAddCarColor(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="White">{i18n.language === 'ar' ? 'أبيض (White)' : 'White'}</option>
+                      <option value="Black">{i18n.language === 'ar' ? 'أسود (Black)' : 'Black'}</option>
+                      <option value="Silver">{i18n.language === 'ar' ? 'فضي (Silver)' : 'Silver'}</option>
+                      <option value="Blue">{i18n.language === 'ar' ? 'أزرق (Blue)' : 'Blue'}</option>
+                      <option value="Red">{i18n.language === 'ar' ? 'أحمر (Red)' : 'Red'}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Online / Offline duty status checkbox */}
+              <div className="flex items-center gap-3 pt-2">
+                <input
+                  type="checkbox"
+                  id="addDriverOnline"
+                  checked={addIsOnline}
+                  onChange={(e) => setAddIsOnline(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-500 bg-slate-800 border-slate-700 focus:ring-emerald-500"
+                />
+                <label htmlFor="addDriverOnline" className="text-xs text-slate-300 cursor-pointer">
+                  {t('driver.goOnline')} ({t('admin.driverDutyStatus')})
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingDriver}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>{isProcessingDriver ? t('common.loading') : t('admin.createDriver')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT DRIVER DETAILS */}
+      {showEditModal && selectedDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 text-left rtl:text-right my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Edit2 className="w-5 h-5 text-blue-400" />
+                  <span>{t('admin.editDriver')}</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">{t('admin.editDriverDesc')}</p>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateDriver} className="space-y-4">
+              {/* Avatar Presets */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-300">{t('admin.driverAvatar')}</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DRIVER_AVATARS.map((av, idx) => (
+                    <img
+                      key={idx}
+                      src={av}
+                      alt={`Avatar ${idx + 1}`}
+                      onClick={() => setEditAvatar(av)}
+                      className={`w-10 h-10 rounded-xl object-cover cursor-pointer border-2 transition-all ${
+                        editAvatar === av ? 'border-blue-500 scale-105 shadow-md shadow-blue-500/30' : 'border-slate-700 opacity-60 hover:opacity-100'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverName')}</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 text-left rtl:text-right"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverEmail')}</label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500 text-left"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverPassword')}</label>
+                  <input
+                    type="text"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder={t('admin.driverPasswordHint')}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500 text-left"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">{t('admin.driverPhone')}</label>
+                  <input
+                    type="text"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500 text-left rtl:text-right"
+                  />
+                </div>
+              </div>
+
+              {/* Vehicle Information Section */}
+              <div className="pt-3 border-t border-slate-800 space-y-3">
+                <div className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5" />
+                  <span>{t('driver.vehicleInfo')}</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-300">{t('admin.driverCarModel')}</label>
+                    <input
+                      type="text"
+                      value={editCarModel}
+                      onChange={(e) => setEditCarModel(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 text-left rtl:text-right"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-300">{t('admin.driverCarPlate')}</label>
+                    <input
+                      type="text"
+                      value={editCarPlate}
+                      onChange={(e) => setEditCarPlate(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500 text-left rtl:text-right"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-300">{t('admin.driverCarColor')}</label>
+                    <select
+                      value={editCarColor}
+                      onChange={(e) => setEditCarColor(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="White">{i18n.language === 'ar' ? 'أبيض (White)' : 'White'}</option>
+                      <option value="Black">{i18n.language === 'ar' ? 'أسود (Black)' : 'Black'}</option>
+                      <option value="Silver">{i18n.language === 'ar' ? 'فضي (Silver)' : 'Silver'}</option>
+                      <option value="Blue">{i18n.language === 'ar' ? 'أزرق (Blue)' : 'Blue'}</option>
+                      <option value="Red">{i18n.language === 'ar' ? 'أحمر (Red)' : 'Red'}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Online / Offline duty status checkbox */}
+              <div className="flex items-center gap-3 pt-2">
+                <input
+                  type="checkbox"
+                  id="editDriverOnline"
+                  checked={editIsOnline}
+                  onChange={(e) => setEditIsOnline(e.target.checked)}
+                  className="w-4 h-4 rounded text-blue-500 bg-slate-800 border-slate-700 focus:ring-blue-500"
+                />
+                <label htmlFor="editDriverOnline" className="text-xs text-slate-300 cursor-pointer">
+                  {t('driver.goOnline')} ({t('admin.driverDutyStatus')})
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingDriver}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 text-white font-black text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isProcessingDriver ? t('common.loading') : t('admin.saveDriver')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

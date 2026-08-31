@@ -280,6 +280,13 @@ const db = {
     await syncToCloud();
     return globalDb.db.users[idx];
   },
+  deleteUser: async (id: string) => {
+    const idx = globalDb.db.users.findIndex((u) => u.id === id);
+    if (idx === -1) return false;
+    globalDb.db.users.splice(idx, 1);
+    await syncToCloud();
+    return true;
+  },
   getTrips: () => [...globalDb.db.trips].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   getTripById: (id: string) => globalDb.db.trips.find((t) => t.id === id),
   createTrip: async (trip: Trip) => {
@@ -783,6 +790,111 @@ router.get('/admin/drivers', authenticate, requireRole('admin'), (_req: AuthRequ
   });
 
   res.json(driversWithStats);
+});
+
+// Admin: Add New Driver
+router.post('/admin/drivers', authenticate, requireRole('admin'), async (req: AuthRequest, res) => {
+  const { name, email, password, phone, avatar, carDetails, isOnline } = req.body;
+
+  if (!name || !email) {
+    return res.status(400).json({ error: 'Name and email are required' });
+  }
+
+  const existing = db.getUserByEmail(email);
+  if (existing) {
+    return res.status(409).json({ error: 'A user with this email address already exists' });
+  }
+
+  const defaultPassword = password && password.trim() ? password.trim() : 'driver123';
+  const hashedPassword = bcrypt.hashSync(defaultPassword, 10);
+
+  const newDriver: User = {
+    id: `user_driver_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    password: hashedPassword,
+    role: 'driver',
+    phone: phone ? phone.trim() : '+20 100 000 0000',
+    avatar: avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name.trim())}`,
+    carDetails: {
+      model: carDetails?.model?.trim() || 'Toyota Corolla',
+      plate: carDetails?.plate?.trim() || '1234 ABC',
+      color: carDetails?.color?.trim() || 'White',
+    },
+    isOnline: isOnline !== undefined ? Boolean(isOnline) : true,
+    currentLocation: { lat: 30.0444, lng: 31.2357 },
+    totalTrips: 0,
+    totalEarnings: 0,
+    rating: 5.0,
+    createdAt: new Date().toISOString(),
+  };
+
+  await db.createUser(newDriver);
+  const { password: _, ...driverWithoutPw } = newDriver;
+  res.status(201).json(driverWithoutPw);
+});
+
+// Admin: Edit Driver Details
+router.put('/admin/drivers/:id', authenticate, requireRole('admin'), async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const driver = db.getUserById(id);
+
+  if (!driver) {
+    return res.status(404).json({ error: 'Driver not found' });
+  }
+
+  const { name, email, password, phone, avatar, carDetails, isOnline } = req.body;
+
+  if (email && email.toLowerCase() !== driver.email.toLowerCase()) {
+    const existing = db.getUserByEmail(email);
+    if (existing && existing.id !== id) {
+      return res.status(409).json({ error: 'A user with this email address already exists' });
+    }
+  }
+
+  const updates: Partial<User> = {
+    ...(name && { name: name.trim() }),
+    ...(email && { email: email.trim().toLowerCase() }),
+    ...(phone !== undefined && { phone: phone.trim() }),
+    ...(avatar !== undefined && { avatar: avatar.trim() }),
+    ...(isOnline !== undefined && { isOnline: Boolean(isOnline) }),
+    ...(carDetails && {
+      carDetails: {
+        model: carDetails.model?.trim() || driver.carDetails?.model || 'Sedan',
+        plate: carDetails.plate?.trim() || driver.carDetails?.plate || '1234 ABC',
+        color: carDetails.color?.trim() || driver.carDetails?.color || 'White',
+      },
+    }),
+  };
+
+  if (password && password.trim().length > 0) {
+    updates.password = bcrypt.hashSync(password.trim(), 10);
+  }
+
+  const updated = await db.updateUser(id, updates);
+  if (!updated) {
+    return res.status(500).json({ error: 'Failed to update driver' });
+  }
+
+  const { password: _, ...driverWithoutPw } = updated;
+  res.json(driverWithoutPw);
+});
+
+// Admin: Delete Driver
+router.delete('/admin/drivers/:id', authenticate, requireRole('admin'), async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const driver = db.getUserById(id);
+
+  if (!driver) {
+    return res.status(404).json({ error: 'Driver not found' });
+  }
+
+  const success = await db.deleteUser(id);
+  if (!success) {
+    return res.status(500).json({ error: 'Failed to delete driver' });
+  }
+
+  res.json({ message: 'Driver deleted successfully', id });
 });
 
 // Settings

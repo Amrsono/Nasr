@@ -200,6 +200,14 @@ class Database {
     return this.data.users[idx];
   }
 
+  public deleteUser(id: string): boolean {
+    const idx = this.data.users.findIndex((u) => u.id === id);
+    if (idx === -1) return false;
+    this.data.users.splice(idx, 1);
+    this.save();
+    return true;
+  }
+
   // Trip Methods
   public getTrips(): Trip[] {
     return [...this.data.trips].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
