@@ -194,11 +194,16 @@ const getInitialSeed = (): DatabaseSchema => {
   };
 };
 
+import { Redis } from '@upstash/redis';
+
 // Global DB instance for Vercel Serverless
 const globalDb: { db: DatabaseSchema } = (global as any)._nasr_db || { db: getInitialSeed() };
 (global as any)._nasr_db = globalDb;
 
-function getKvCredentials(): { url?: string; token?: string } {
+let redisClient: Redis | null = null;
+
+function getRedis(): Redis | null {
+  if (redisClient) return redisClient;
   const env = process.env;
   let url =
     env.STORAGE_REST_API_URL ||
@@ -212,7 +217,6 @@ function getKvCredentials(): { url?: string; token?: string } {
     env.KV_REST_API_TOKEN ||
     env.REDIS_REST_API_TOKEN;
 
-  // Dynamic discovery if custom prefix is used
   if (!url) {
     const urlKey = Object.keys(env).find((k) => k.endsWith('_REST_API_URL') && env[k]);
     if (urlKey) url = env[urlKey];
@@ -222,26 +226,26 @@ function getKvCredentials(): { url?: string; token?: string } {
     if (tokenKey) token = env[tokenKey];
   }
 
-  return { url, token };
+  if (url && token) {
+    try {
+      redisClient = new Redis({ url, token });
+      return redisClient;
+    } catch (e) {
+      console.error('Failed to init Redis client', e);
+    }
+  }
+  return null;
 }
 
 // Vercel Redis / Upstash Cloud Database Sync
 async function syncFromCloud(): Promise<void> {
-  const { url: kvUrl, token: kvToken } = getKvCredentials();
-  if (!kvUrl || !kvToken) return;
+  const redis = getRedis();
+  if (!redis) return;
 
   try {
-    const res = await fetch(`${kvUrl}/get/nasr_db`, {
-      headers: { Authorization: `Bearer ${kvToken}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.result) {
-        const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
-        if (parsed && parsed.users && Array.isArray(parsed.trips)) {
-          globalDb.db = parsed;
-        }
-      }
+    const data = await redis.get<DatabaseSchema>('nasr_db');
+    if (data && data.users && Array.isArray(data.trips)) {
+      globalDb.db = data;
     }
   } catch (e) {
     console.error('Vercel Redis syncFromCloud error:', e);
@@ -249,18 +253,11 @@ async function syncFromCloud(): Promise<void> {
 }
 
 async function syncToCloud(): Promise<void> {
-  const { url: kvUrl, token: kvToken } = getKvCredentials();
-  if (!kvUrl || !kvToken) return;
+  const redis = getRedis();
+  if (!redis) return;
 
   try {
-    await fetch(`${kvUrl}/set/nasr_db`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${kvToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(JSON.stringify(globalDb.db)),
-    });
+    await redis.set('nasr_db', globalDb.db);
   } catch (e) {
     console.error('Vercel Redis syncToCloud error:', e);
   }

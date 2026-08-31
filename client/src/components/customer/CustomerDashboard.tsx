@@ -82,7 +82,20 @@ export const CustomerDashboard: React.FC = () => {
         api.getActiveTrip().catch(() => null),
         api.getTrips().catch(() => []),
       ]);
-      setActiveTrip(active);
+
+      setActiveTrip((prev) => {
+        if (!active && prev && ['REQUESTED', 'ACCEPTED', 'PICKED_UP'].includes(prev.status)) {
+          const fromHistory = history.find((t) => t.id === prev.id);
+          if (fromHistory) {
+            if (fromHistory.status === 'DROPPED_OFF' || fromHistory.status === 'CANCELLED') {
+              return fromHistory.status === 'DROPPED_OFF' ? fromHistory : null;
+            }
+          }
+          return prev;
+        }
+        return active;
+      });
+
       setRecentTrips(history);
     } catch (err) {
       console.error('Error fetching customer data', err);
