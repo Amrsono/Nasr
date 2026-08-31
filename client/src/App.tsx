@@ -6,6 +6,7 @@ import { CustomerDashboard } from './components/customer/CustomerDashboard';
 import { DriverDashboard } from './components/driver/DriverDashboard';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { Car } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 export const AppContent: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -48,7 +49,12 @@ export const AppContent: React.FC = () => {
 };
 
 export const App: React.FC = () => {
-  return <AppContent />;
+  return (
+    <>
+      <AppContent />
+      <Analytics />
+    </>
+  );
 };
 
 export default App;
