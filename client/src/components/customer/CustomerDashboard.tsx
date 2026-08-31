@@ -16,6 +16,7 @@ import {
   XCircle,
   Sparkles,
   History,
+  Building2,
 } from 'lucide-react';
 
 const KNOWN_COORDS_MAP: Record<string, LocationCoords> = {
@@ -101,6 +102,7 @@ export const CustomerDashboard: React.FC = () => {
 
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupCoords, setPickupCoords] = useState<LocationCoords>({ lat: 30.0444, lng: 31.2357 });
+  const [buildingNumber, setBuildingNumber] = useState('');
 
   const [destAddress, setDestAddress] = useState('');
   const [destCoords, setDestCoords] = useState<LocationCoords>({ lat: 30.0735, lng: 31.3456 });
@@ -269,8 +271,12 @@ export const CustomerDashboard: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      const fullPickupAddress = buildingNumber.trim()
+        ? `${pickupAddress} (${i18n.language === 'ar' ? 'عمارة' : 'Bldg'} ${buildingNumber.trim()})`
+        : pickupAddress;
+
       const newTrip = await api.createTrip({
-        pickupAddress,
+        pickupAddress: fullPickupAddress,
         pickupCoords,
         destinationAddress: destAddress,
         destinationCoords: destCoords,
@@ -594,6 +600,25 @@ export const CustomerDashboard: React.FC = () => {
                   );
                 })}
               </select>
+            </div>
+
+            {/* Building Number Input (Directly below Pickup Location) */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>{t('customer.buildingNumber')}</span>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  ({i18n.language === 'ar' ? 'أدخل رقم العمارة / الفيلا' : 'Enter building or villa number'})
+                </span>
+              </label>
+              <input
+                type="text"
+                value={buildingNumber}
+                onChange={(e) => setBuildingNumber(e.target.value)}
+                placeholder={t('customer.buildingPlaceholder')}
+                className="w-full bg-slate-800/80 border border-slate-700 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-all text-left rtl:text-right font-medium"
+                required
+              />
             </div>
 
             <div className="space-y-1.5">

@@ -67,6 +67,8 @@
   "customer": {
     "bookRide": "حجز رحلة جديدة",
     "pickupLocation": "نقطة الانطلاق (موقع الركوب)",
+    "buildingNumber": "رقم العمارة / المبنى",
+    "buildingPlaceholder": "مثال: عمارة ٢٤ أو مدخل ٢ (أو فيلا ١٠)",
     "dropoffLocation": "وجهة الوصول (نقطة النزول)",
     "pinOnMap": "تحديد على الخريطة",
     "searchAddress": "ابحث عن عنوان أو معلم شهير...",

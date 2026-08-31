@@ -67,6 +67,8 @@
   "customer": {
     "bookRide": "Book a Ride",
     "pickupLocation": "Pickup Location",
+    "buildingNumber": "Building Number",
+    "buildingPlaceholder": "e.g. Building 24, Entrance 2",
     "dropoffLocation": "Destination Location",
     "pinOnMap": "Pin on Map",
     "searchAddress": "Search address or landmark...",
