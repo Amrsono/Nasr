@@ -38,6 +38,8 @@ const DRIVER_AVATARS = [
 ];
 
 const PRESET_ZONE_LOCATIONS = [
+  'Ashgar City',
+  'Dar Masr',
   'Tahrir Square (Downtown)',
   'Cairo Airport Terminal 3',
   'Citystars Mall (Nasr City)',

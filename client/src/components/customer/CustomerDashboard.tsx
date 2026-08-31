@@ -19,6 +19,13 @@ import {
 } from 'lucide-react';
 
 const KNOWN_COORDS_MAP: Record<string, LocationCoords> = {
+  'ashgar': { lat: 29.9482, lng: 31.0625 },
+  'ashgar city': { lat: 29.9482, lng: 31.0625 },
+  'أشجار': { lat: 29.9482, lng: 31.0625 },
+  'أشجار سيتي': { lat: 29.9482, lng: 31.0625 },
+  'dar masr': { lat: 29.965, lng: 31.02 },
+  'dar misr': { lat: 29.965, lng: 31.02 },
+  'دار مصر': { lat: 29.965, lng: 31.02 },
   tahrir: { lat: 30.0444, lng: 31.2357 },
   downtown: { lat: 30.0444, lng: 31.2357 },
   تحرير: { lat: 30.0444, lng: 31.2357 },
@@ -60,6 +67,21 @@ const KNOWN_COORDS_MAP: Record<string, LocationCoords> = {
   capital: { lat: 30.0131, lng: 31.7456 },
   'العاصمة الإدارية': { lat: 30.0131, lng: 31.7456 },
 };
+
+const PICKUP_LOCATION_OPTIONS = [
+  {
+    id: 'ashgar_city',
+    nameEn: 'Ashgar City',
+    nameAr: 'أشجار سيتي',
+    coords: { lat: 29.9482, lng: 31.0625 },
+  },
+  {
+    id: 'dar_masr',
+    nameEn: 'Dar Masr',
+    nameAr: 'دار مصر',
+    coords: { lat: 29.965, lng: 31.02 },
+  },
+];
 
 function getCoordsForLocation(name: string): LocationCoords {
   const lower = name.toLowerCase();
@@ -532,18 +554,46 @@ export const CustomerDashboard: React.FC = () => {
 
           <form onSubmit={handleRequestRide} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                {t('customer.pickupLocation')}
+              <label className="text-xs text-slate-300 font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t('customer.pickupLocation')}</span>
+                </span>
+                <span className="text-[10px] text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
+                  {i18n.language === 'ar' ? 'نقطة انطلاق معتمدة' : 'Official Hub'}
+                </span>
               </label>
-              <input
-                type="text"
+
+              <select
                 value={pickupAddress}
-                onChange={(e) => setPickupAddress(e.target.value)}
-                placeholder={t('customer.searchAddress')}
-                className="w-full bg-slate-800/80 border border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-all text-left rtl:text-right"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPickupAddress(val);
+                  const matchedOption = PICKUP_LOCATION_OPTIONS.find(
+                    (opt) => (i18n.language === 'ar' ? opt.nameAr : opt.nameEn) === val || opt.nameEn === val || opt.nameAr === val
+                  );
+                  if (matchedOption) {
+                    setPickupCoords(matchedOption.coords);
+                  } else if (val) {
+                    setPickupCoords(getCoordsForLocation(val));
+                  }
+                }}
+                className="w-full bg-slate-800/90 border border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none transition-all cursor-pointer font-medium"
                 required
-              />
+              >
+                <option value="" disabled className="bg-slate-900 text-slate-400">
+                  {i18n.language === 'ar' ? '-- اختر نقطة الركوب (أشجار سيتي / دار مصر) --' : '-- Select Pickup Location (Ashgar City / Dar Masr) --'}
+                </option>
+                {PICKUP_LOCATION_OPTIONS.map((opt) => {
+                  const displayName = i18n.language === 'ar' ? opt.nameAr : opt.nameEn;
+                  const secondaryName = i18n.language === 'ar' ? opt.nameEn : opt.nameAr;
+                  return (
+                    <option key={opt.id} value={displayName} className="bg-slate-900 text-white py-1">
+                      {displayName} ({secondaryName})
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             <div className="space-y-1.5">
@@ -618,7 +668,8 @@ export const CustomerDashboard: React.FC = () => {
                       type="button"
                       onClick={() => {
                         const coords = getCoordsForLocation(spot);
-                        if (!pickupAddress.trim()) {
+                        const isPickupHub = spot.toLowerCase().includes('ashgar') || spot.toLowerCase().includes('أشجار') || spot.toLowerCase().includes('dar') || spot.toLowerCase().includes('دار');
+                        if (isPickupHub && !pickupAddress.trim()) {
                           setPickupAddress(spot);
                           setPickupCoords(coords);
                         } else {
