@@ -238,7 +238,7 @@ async function syncFromCloud(): Promise<void> {
       const data = await res.json();
       if (data && data.result) {
         const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
-        if (parsed.users && Array.isArray(parsed.trips)) {
+        if (parsed && parsed.users && Array.isArray(parsed.trips)) {
           globalDb.db = parsed;
         }
       }
@@ -270,41 +270,41 @@ const db = {
   getUsers: () => globalDb.db.users,
   getUserById: (id: string) => globalDb.db.users.find((u) => u.id === id),
   getUserByEmail: (email: string) => globalDb.db.users.find((u) => u.email.toLowerCase() === email.toLowerCase()),
-  createUser: (user: User) => {
+  createUser: async (user: User) => {
     globalDb.db.users.push(user);
-    syncToCloud();
+    await syncToCloud();
     return user;
   },
-  updateUser: (id: string, updates: Partial<User>) => {
+  updateUser: async (id: string, updates: Partial<User>) => {
     const idx = globalDb.db.users.findIndex((u) => u.id === id);
     if (idx === -1) return undefined;
     globalDb.db.users[idx] = { ...globalDb.db.users[idx], ...updates };
-    syncToCloud();
+    await syncToCloud();
     return globalDb.db.users[idx];
   },
   getTrips: () => [...globalDb.db.trips].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   getTripById: (id: string) => globalDb.db.trips.find((t) => t.id === id),
-  createTrip: (trip: Trip) => {
+  createTrip: async (trip: Trip) => {
     globalDb.db.trips.unshift(trip);
-    syncToCloud();
+    await syncToCloud();
     return trip;
   },
-  updateTrip: (id: string, updates: Partial<Trip>) => {
+  updateTrip: async (id: string, updates: Partial<Trip>) => {
     const idx = globalDb.db.trips.findIndex((t) => t.id === id);
     if (idx === -1) return undefined;
     globalDb.db.trips[idx] = { ...globalDb.db.trips[idx], ...updates };
-    syncToCloud();
+    await syncToCloud();
     return globalDb.db.trips[idx];
   },
   getSettings: () => globalDb.db.settings,
-  updateSettings: (settings: Partial<SystemSettings>) => {
+  updateSettings: async (settings: Partial<SystemSettings>) => {
     globalDb.db.settings = { ...globalDb.db.settings, ...settings };
-    syncToCloud();
+    await syncToCloud();
     return globalDb.db.settings;
   },
-  reset: () => {
+  reset: async () => {
     globalDb.db = getInitialSeed();
-    syncToCloud();
+    await syncToCloud();
   },
 };
 
@@ -394,7 +394,7 @@ router.get('/health', (_req, res) => {
     status: 'ok',
     time: new Date().toISOString(),
     app: 'Nasr Ride Vercel Serverless',
-    database: process.env.KV_REST_API_URL ? 'Vercel KV Connected' : 'In-Memory Serverless Cache',
+    database: process.env.STORAGE_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL ? 'Vercel Redis Connected' : 'In-Memory Serverless Cache',
   });
 });
 
@@ -451,7 +451,7 @@ router.post('/auth/login', (req, res) => {
 });
 
 // Register
-router.post('/auth/register', (req, res) => {
+router.post('/auth/register', async (req, res) => {
   const { name, email, password, role, phone, carDetails } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -482,7 +482,7 @@ router.post('/auth/register', (req, res) => {
     createdAt: new Date().toISOString(),
   };
 
-  db.createUser(newUser);
+  await db.createUser(newUser);
   const token = generateToken(newUser);
   const { password: _, ...userWithoutPw } = newUser;
 
@@ -497,10 +497,10 @@ router.get('/auth/me', authenticate, (req: AuthRequest, res) => {
 });
 
 // Update Profile
-router.put('/auth/me', authenticate, (req: AuthRequest, res) => {
+router.put('/auth/me', authenticate, async (req: AuthRequest, res) => {
   const { name, phone, avatar, carDetails, isOnline, currentLocation } = req.body;
   
-  const updated = db.updateUser(req.user!.id, {
+  const updated = await db.updateUser(req.user!.id, {
     ...(name && { name }),
     ...(phone && { phone }),
     ...(avatar && { avatar }),
@@ -559,7 +559,7 @@ router.get('/trips/:id', authenticate, (req: AuthRequest, res) => {
 });
 
 // Create Trip
-router.post('/trips', authenticate, (req: AuthRequest, res) => {
+router.post('/trips', authenticate, async (req: AuthRequest, res) => {
   const user = req.user!;
   const { pickupAddress, pickupCoords, destinationAddress, destinationCoords, distanceKm, notes } = req.body;
 
@@ -598,12 +598,12 @@ router.post('/trips', authenticate, (req: AuthRequest, res) => {
     customerRating: null,
   };
 
-  db.createTrip(newTrip);
+  await db.createTrip(newTrip);
   res.status(201).json(newTrip);
 });
 
 // Accept Trip
-router.post('/trips/:id/accept', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
+router.post('/trips/:id/accept', authenticate, requireRole('driver'), async (req: AuthRequest, res) => {
   const driver = req.user!;
   const trip = db.getTripById(req.params.id);
 
@@ -616,7 +616,7 @@ router.post('/trips/:id/accept', authenticate, requireRole('driver'), (req: Auth
     ? `${driver.carDetails.model} (${driver.carDetails.color}) - ${driver.carDetails.plate}`
     : 'Sedan';
 
-  const updatedTrip = db.updateTrip(trip.id, {
+  const updatedTrip = await db.updateTrip(trip.id, {
     driverId: driver.id,
     driverName: driver.name,
     driverPhone: driver.phone || '+20 100 000 0000',
@@ -629,14 +629,14 @@ router.post('/trips/:id/accept', authenticate, requireRole('driver'), (req: Auth
 });
 
 // Flag Picked Up
-router.post('/trips/:id/pickup', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
+router.post('/trips/:id/pickup', authenticate, requireRole('driver'), async (req: AuthRequest, res) => {
   const driver = req.user!;
   const trip = db.getTripById(req.params.id);
 
   if (!trip) return res.status(404).json({ error: 'Trip not found' });
   if (trip.driverId !== driver.id) return res.status(403).json({ error: 'Not authorized for this trip' });
 
-  const updatedTrip = db.updateTrip(trip.id, {
+  const updatedTrip = await db.updateTrip(trip.id, {
     status: 'PICKED_UP',
     pickedUpAt: new Date().toISOString(),
   });
@@ -645,7 +645,7 @@ router.post('/trips/:id/pickup', authenticate, requireRole('driver'), (req: Auth
 });
 
 // Flag Dropped Off
-router.post('/trips/:id/dropoff', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
+router.post('/trips/:id/dropoff', authenticate, requireRole('driver'), async (req: AuthRequest, res) => {
   const driver = req.user!;
   const trip = db.getTripById(req.params.id);
   const { amountPaid } = req.body;
@@ -655,7 +655,7 @@ router.post('/trips/:id/dropoff', authenticate, requireRole('driver'), (req: Aut
 
   const finalFare = parseFloat(amountPaid) || trip.estimatedFare;
 
-  const updatedTrip = db.updateTrip(trip.id, {
+  const updatedTrip = await db.updateTrip(trip.id, {
     status: 'DROPPED_OFF',
     finalFare,
     droppedOffAt: new Date().toISOString(),
@@ -664,7 +664,7 @@ router.post('/trips/:id/dropoff', authenticate, requireRole('driver'), (req: Aut
   // Update driver earnings
   const driverRecord = db.getUserById(driver.id);
   if (driverRecord) {
-    db.updateUser(driver.id, {
+    await db.updateUser(driver.id, {
       totalTrips: (driverRecord.totalTrips || 0) + 1,
       totalEarnings: (driverRecord.totalEarnings || 0) + finalFare,
     });
@@ -674,7 +674,7 @@ router.post('/trips/:id/dropoff', authenticate, requireRole('driver'), (req: Aut
 });
 
 // Cancel Trip
-router.post('/trips/:id/cancel', authenticate, (req: AuthRequest, res) => {
+router.post('/trips/:id/cancel', authenticate, async (req: AuthRequest, res) => {
   const user = req.user!;
   const trip = db.getTripById(req.params.id);
 
@@ -683,7 +683,7 @@ router.post('/trips/:id/cancel', authenticate, (req: AuthRequest, res) => {
     return res.status(403).json({ error: 'Not authorized to cancel this trip' });
   }
 
-  const updatedTrip = db.updateTrip(trip.id, {
+  const updatedTrip = await db.updateTrip(trip.id, {
     status: 'CANCELLED',
     cancelledAt: new Date().toISOString(),
   });
@@ -692,7 +692,7 @@ router.post('/trips/:id/cancel', authenticate, (req: AuthRequest, res) => {
 });
 
 // Rate Trip
-router.post('/trips/:id/rate', authenticate, (req: AuthRequest, res) => {
+router.post('/trips/:id/rate', authenticate, async (req: AuthRequest, res) => {
   const user = req.user!;
   const trip = db.getTripById(req.params.id);
   const { rating } = req.body;
@@ -703,13 +703,13 @@ router.post('/trips/:id/rate', authenticate, (req: AuthRequest, res) => {
   }
 
   const numRating = Math.min(5, Math.max(1, parseInt(rating) || 5));
-  const updatedTrip = db.updateTrip(trip.id, { customerRating: numRating });
+  const updatedTrip = await db.updateTrip(trip.id, { customerRating: numRating });
 
   if (trip.driverId) {
     const driverTrips = db.getTrips().filter((t) => t.driverId === trip.driverId && t.customerRating);
     if (driverTrips.length > 0) {
       const avg = driverTrips.reduce((acc, t) => acc + (t.customerRating || 5), 0) / driverTrips.length;
-      db.updateUser(trip.driverId, { rating: parseFloat(avg.toFixed(1)) });
+      await db.updateUser(trip.driverId, { rating: parseFloat(avg.toFixed(1)) });
     }
   }
 
@@ -772,13 +772,13 @@ router.get('/settings', (_req, res) => {
   res.json(db.getSettings());
 });
 
-router.put('/settings', authenticate, requireRole('admin'), (req: AuthRequest, res) => {
-  const updated = db.updateSettings(req.body);
+router.put('/settings', authenticate, requireRole('admin'), async (req: AuthRequest, res) => {
+  const updated = await db.updateSettings(req.body);
   res.json(updated);
 });
 
-router.post('/admin/reset', (_req, res) => {
-  db.reset();
+router.post('/admin/reset', async (_req, res) => {
+  await db.reset();
   res.json({ success: true, message: 'Database reset to clean state' });
 });
 

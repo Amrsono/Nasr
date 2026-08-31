@@ -98,6 +98,9 @@ export const DriverDashboard: React.FC = () => {
   const currencyLabel = t('app.egp');
   const distanceUnit = t('app.km');
 
+  // Audio Alert Tracking
+  const notifiedTripIds = useRef<Set<string>>(new Set());
+
   // Load Driver's queue and active trip
   const loadDriverData = async () => {
     try {
@@ -106,6 +109,20 @@ export const DriverDashboard: React.FC = () => {
         api.getActiveTrip().catch(() => null),
         api.getTrips().catch(() => []),
       ]);
+
+      // Sound notification only once per new trip request
+      if (isOnline && queue.length > 0) {
+        queue.forEach((t) => {
+          if (!notifiedTripIds.current.has(t.id)) {
+            notifiedTripIds.current.add(t.id);
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+              audio.play().catch(() => {});
+            } catch (e) {}
+          }
+        });
+      }
+
       setQueueTrips(queue);
       setActiveTrip(active);
       setDriverTrips(trips);
@@ -116,9 +133,9 @@ export const DriverDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDriverData();
-    const interval = setInterval(loadDriverData, 2500);
+    const interval = setInterval(loadDriverData, 2000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isOnline]);
 
   // Sync edit profile form state when user profile changes
   useEffect(() => {
