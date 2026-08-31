@@ -32,14 +32,10 @@ export const CustomerDashboard: React.FC = () => {
   const { user, settings } = useAuth();
   const { t, i18n } = useTranslation();
 
-  const [pickupAddress, setPickupAddress] = useState(
-    i18n.language === 'ar' ? 'ميدان التحرير، وسط البلد، القاهرة' : 'Tahrir Square, Downtown Cairo'
-  );
+  const [pickupAddress, setPickupAddress] = useState('');
   const [pickupCoords, setPickupCoords] = useState<LocationCoords>({ lat: 30.0444, lng: 31.2357 });
 
-  const [destAddress, setDestAddress] = useState(
-    i18n.language === 'ar' ? 'سيتي ستارز مول، شارع عمر بن الخطاب، مدينة نصر' : 'Citystars Mall, Omar Ibn El-Khattab, Nasr City'
-  );
+  const [destAddress, setDestAddress] = useState('');
   const [destCoords, setDestCoords] = useState<LocationCoords>({ lat: 30.0735, lng: 31.3456 });
 
   const [notes, setNotes] = useState('');
@@ -96,11 +92,12 @@ export const CustomerDashboard: React.FC = () => {
     return parseFloat((R * c).toFixed(1));
   };
 
-  const matchedRoute = findMatchingFixedRoute(pickupAddress, destAddress, settings?.fixedRoutes);
-  const distanceKm = Math.max(1.5, calculateDistance(pickupCoords, destCoords));
+  const hasRoute = pickupAddress.trim().length > 0 && destAddress.trim().length > 0;
+  const matchedRoute = hasRoute ? findMatchingFixedRoute(pickupAddress, destAddress, settings?.fixedRoutes) : null;
+  const distanceKm = hasRoute ? Math.max(1.5, calculateDistance(pickupCoords, destCoords)) : 0;
   const baseFare = settings?.baseFare || 20;
   const perKm = settings?.perKmRate || 6.5;
-  const estimatedFare = matchedRoute ? matchedRoute.price : Math.round(baseFare + distanceKm * perKm);
+  const estimatedFare = !hasRoute ? 0 : matchedRoute ? matchedRoute.price : Math.round(baseFare + distanceKm * perKm);
 
   // Load Active Trip and History
   const loadData = async () => {
@@ -536,7 +533,9 @@ export const CustomerDashboard: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.distance')}</div>
-                  <div className="text-sm font-bold text-slate-200 font-mono">{distanceKm} {distanceUnit}</div>
+                  <div className="text-sm font-bold text-slate-200 font-mono">
+                    {hasRoute ? `${distanceKm} ${distanceUnit}` : '--'}
+                  </div>
                 </div>
                 <div className="text-right rtl:text-left">
                   <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-end rtl:justify-start gap-1">
@@ -548,7 +547,15 @@ export const CustomerDashboard: React.FC = () => {
                     )}
                   </div>
                   <div className={`text-lg font-black font-mono ${matchedRoute ? 'text-purple-400' : 'text-emerald-400'}`}>
-                    {estimatedFare} <span className="text-xs font-sans text-slate-400">{currencyLabel}</span>
+                    {hasRoute ? (
+                      <>
+                        {estimatedFare} <span className="text-xs font-sans text-slate-400">{currencyLabel}</span>
+                      </>
+                    ) : (
+                      <span className="text-slate-500 text-sm font-normal">
+                        {i18n.language === 'ar' ? 'حدد الوجهة أولاً' : 'Enter destinations'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -563,11 +570,11 @@ export const CustomerDashboard: React.FC = () => {
 
             <button
               type="submit"
-              disabled={isSubmitting || !!activeTrip}
+              disabled={isSubmitting || !!activeTrip || !hasRoute}
               className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
-                activeTrip
+                activeTrip || !hasRoute
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 shadow-emerald-500/20 active:scale-[0.99]'
+                  : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 shadow-emerald-500/20 active:scale-[0.99] cursor-pointer'
               }`}
             >
               <Car className="w-4 h-4" />

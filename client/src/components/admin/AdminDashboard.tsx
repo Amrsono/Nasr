@@ -77,10 +77,10 @@ export const AdminDashboard: React.FC = () => {
   // Form states for Add Driver
   const [addName, setAddName] = useState('');
   const [addEmail, setAddEmail] = useState('');
-  const [addPassword, setAddPassword] = useState('driver123');
-  const [addPhone, setAddPhone] = useState('+20 100 000 0000');
-  const [addCarModel, setAddCarModel] = useState('Toyota Corolla');
-  const [addCarPlate, setAddCarPlate] = useState('1234 ABC');
+  const [addPassword, setAddPassword] = useState('');
+  const [addPhone, setAddPhone] = useState('');
+  const [addCarModel, setAddCarModel] = useState('');
+  const [addCarPlate, setAddCarPlate] = useState('');
   const [addCarColor, setAddCarColor] = useState('White');
   const [addAvatar, setAddAvatar] = useState(DRIVER_AVATARS[0]);
   const [addIsOnline, setAddIsOnline] = useState(true);
@@ -104,9 +104,9 @@ export const AdminDashboard: React.FC = () => {
   const [isProcessingRoute, setIsProcessingRoute] = useState(false);
 
   // Form states for Add Route
-  const [addPickupName, setAddPickupName] = useState(PRESET_ZONE_LOCATIONS[0]);
-  const [addDestName, setAddDestName] = useState(PRESET_ZONE_LOCATIONS[1]);
-  const [addRoutePrice, setAddRoutePrice] = useState('180');
+  const [addPickupName, setAddPickupName] = useState('');
+  const [addDestName, setAddDestName] = useState('');
+  const [addRoutePrice, setAddRoutePrice] = useState('');
   const [addIsBidirectional, setAddIsBidirectional] = useState(true);
   const [addRouteIsActive, setAddRouteIsActive] = useState(true);
 
@@ -204,13 +204,13 @@ export const AdminDashboard: React.FC = () => {
 
   const handleOpenAdd = () => {
     setAddName('');
-    setAddEmail(`driver${drivers.length + 1}@nasr.com`);
-    setAddPassword('driver123');
-    setAddPhone('+20 100 ' + Math.floor(100 + Math.random() * 900) + ' ' + Math.floor(1000 + Math.random() * 9000));
-    setAddCarModel('Toyota Corolla');
-    setAddCarPlate(Math.floor(1000 + Math.random() * 9000) + ' ABC');
+    setAddEmail('');
+    setAddPassword('');
+    setAddPhone('');
+    setAddCarModel('');
+    setAddCarPlate('');
     setAddCarColor('White');
-    setAddAvatar(DRIVER_AVATARS[Math.floor(Math.random() * DRIVER_AVATARS.length)]);
+    setAddAvatar(DRIVER_AVATARS[0]);
     setAddIsOnline(true);
     setShowAddModal(true);
   };
@@ -224,12 +224,12 @@ export const AdminDashboard: React.FC = () => {
         name: addName.trim(),
         email: addEmail.trim(),
         password: addPassword.trim() || 'driver123',
-        phone: addPhone.trim(),
+        phone: addPhone.trim() || '+20 100 000 0000',
         avatar: addAvatar,
         carDetails: {
-          model: addCarModel.trim(),
-          plate: addCarPlate.trim(),
-          color: addCarColor.trim(),
+          model: addCarModel.trim() || 'Toyota Corolla',
+          plate: addCarPlate.trim() || '1234 ABC',
+          color: addCarColor.trim() || 'White',
         },
         isOnline: addIsOnline,
       });
@@ -299,9 +299,9 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleOpenAddRoute = () => {
-    setAddPickupName(PRESET_ZONE_LOCATIONS[0]);
-    setAddDestName(PRESET_ZONE_LOCATIONS[1]);
-    setAddRoutePrice('180');
+    setAddPickupName('');
+    setAddDestName('');
+    setAddRoutePrice('');
     setAddIsBidirectional(true);
     setAddRouteIsActive(true);
     setShowAddRouteModal(true);

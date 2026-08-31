@@ -405,6 +405,16 @@ export const DriverDashboard: React.FC = () => {
     }
   };
 
+  const handleOpenEditProfile = () => {
+    setNameInput(user?.name || '');
+    setPhoneInput(user?.phone || '');
+    setCarModelInput(user?.carDetails?.model || '');
+    setCarPlateInput(user?.carDetails?.plate || '');
+    setCarColorInput(user?.carDetails?.color || 'White');
+    setAvatarInput(user?.avatar || '');
+    setShowEditProfileModal(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
       {/* Toast Notification Banner */}
@@ -467,7 +477,7 @@ export const DriverDashboard: React.FC = () => {
                 {user?.carDetails?.model || 'Toyota Corolla'}
               </span>
               <button
-                onClick={() => setShowEditProfileModal(true)}
+                onClick={handleOpenEditProfile}
                 className="flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2.5 py-0.5 rounded-lg transition-all cursor-pointer"
               >
                 <Edit3 className="w-3 h-3" />
