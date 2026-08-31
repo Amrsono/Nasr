@@ -4,6 +4,7 @@
   "description": "Nasr Ride-Hailing Web Application connecting Customers, Drivers, and Admin",
   "private": true,
   "scripts": {
+    "postinstall": "npm install --prefix client",
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "build:server": "npm run build --prefix server",
