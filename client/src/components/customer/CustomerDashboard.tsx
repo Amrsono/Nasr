@@ -18,15 +18,60 @@ import {
   History,
 } from 'lucide-react';
 
-const PRESET_LOCATIONS: { nameEn: string; nameAr: string; addressEn: string; addressAr: string; coords: LocationCoords }[] = [
-  { nameEn: 'Tahrir Square (Downtown)', nameAr: 'ميدان التحرير (وسط البلد)', addressEn: 'Tahrir Square, Downtown Cairo', addressAr: 'ميدان التحرير، وسط البلد، القاهرة', coords: { lat: 30.0444, lng: 31.2357 } },
-  { nameEn: 'Cairo Airport Terminal 3', nameAr: 'مطار القاهرة مبنى ٣', addressEn: 'Cairo International Airport, Terminal 3', addressAr: 'مطار القاهرة الدولي، صالة ٣', coords: { lat: 30.1219, lng: 31.4056 } },
-  { nameEn: 'Citystars Mall (Nasr City)', nameAr: 'سيتي ستارز (مدينة نصر)', addressEn: 'Citystars Mall, Omar Ibn El-Khattab, Nasr City', addressAr: 'سيتي ستارز مول، شارع عمر بن الخطاب، مدينة نصر', coords: { lat: 30.0735, lng: 31.3456 } },
-  { nameEn: 'Zamalek (Gezira Island)', nameAr: 'حي الزمالك', addressEn: '26th of July St, Zamalek, Cairo', addressAr: 'شارع ٢٦ يوليو، الزمالك، القاهرة', coords: { lat: 30.0617, lng: 31.2195 } },
-  { nameEn: 'New Cairo (5th Settlement)', nameAr: 'التجمع الخامس (شارع التسعين)', addressEn: '90th Street, 5th Settlement, New Cairo', addressAr: 'شارع التسعين، التجمع الخامس، القاهرة الجديدة', coords: { lat: 30.0167, lng: 31.4397 } },
-  { nameEn: 'Maadi Corniche', nameAr: 'كورنيش المعادي', addressEn: 'Corniche El Maadi, Cairo', addressAr: 'كورنيش المعادي، القاهرة', coords: { lat: 29.9602, lng: 31.2569 } },
-  { nameEn: 'Giza Pyramids', nameAr: 'أهرامات الجيزة', addressEn: 'Al Haram, Giza Governorate', addressAr: 'منطقة الأهرامات، الهرم، الجيزة', coords: { lat: 29.9792, lng: 31.1342 } },
-];
+const KNOWN_COORDS_MAP: Record<string, LocationCoords> = {
+  tahrir: { lat: 30.0444, lng: 31.2357 },
+  downtown: { lat: 30.0444, lng: 31.2357 },
+  تحرير: { lat: 30.0444, lng: 31.2357 },
+  airport: { lat: 30.1219, lng: 31.4056 },
+  مطار: { lat: 30.1219, lng: 31.4056 },
+  citystars: { lat: 30.0735, lng: 31.3456 },
+  'nasr city': { lat: 30.0561, lng: 31.3456 },
+  'سيتي ستارز': { lat: 30.0735, lng: 31.3456 },
+  'مدينة نصر': { lat: 30.0561, lng: 31.3456 },
+  zamalek: { lat: 30.0617, lng: 31.2195 },
+  زمالك: { lat: 30.0617, lng: 31.2195 },
+  'new cairo': { lat: 30.0167, lng: 31.4397 },
+  '5th settlement': { lat: 30.0167, lng: 31.4397 },
+  'التجمع': { lat: 30.0167, lng: 31.4397 },
+  'القاهرة الجديدة': { lat: 30.0167, lng: 31.4397 },
+  maadi: { lat: 29.9602, lng: 31.2569 },
+  معادي: { lat: 29.9602, lng: 31.2569 },
+  pyramids: { lat: 29.9792, lng: 31.1342 },
+  giza: { lat: 29.9792, lng: 31.1342 },
+  أهرامات: { lat: 29.9792, lng: 31.1342 },
+  جيزة: { lat: 29.9792, lng: 31.1342 },
+  heliopolis: { lat: 30.0898, lng: 31.3285 },
+  'مصر الجديدة': { lat: 30.0898, lng: 31.3285 },
+  korba: { lat: 30.0911, lng: 31.3256 },
+  الكوربة: { lat: 30.0911, lng: 31.3256 },
+  'sheikh zayed': { lat: 30.0489, lng: 30.9856 },
+  'الشيخ زايد': { lat: 30.0489, lng: 30.9856 },
+  october: { lat: 29.9737, lng: 30.9529 },
+  أكتوبر: { lat: 29.9737, lng: 30.9529 },
+  '6th of october': { lat: 29.9737, lng: 30.9529 },
+  mohandessin: { lat: 30.0543, lng: 31.2014 },
+  المهندسين: { lat: 30.0543, lng: 31.2014 },
+  rehab: { lat: 30.0611, lng: 31.4936 },
+  الرحاب: { lat: 30.0611, lng: 31.4936 },
+  madinaty: { lat: 30.1089, lng: 31.6256 },
+  مدينتي: { lat: 30.1089, lng: 31.6256 },
+  shorouk: { lat: 30.1344, lng: 31.6089 },
+  الشروق: { lat: 30.1344, lng: 31.6089 },
+  capital: { lat: 30.0131, lng: 31.7456 },
+  'العاصمة الإدارية': { lat: 30.0131, lng: 31.7456 },
+};
+
+function getCoordsForLocation(name: string): LocationCoords {
+  const lower = name.toLowerCase();
+  for (const [key, coords] of Object.entries(KNOWN_COORDS_MAP)) {
+    if (lower.includes(key)) return coords;
+  }
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const latOffset = ((Math.abs(hash) % 100) - 50) / 500;
+  const lngOffset = ((Math.abs(hash * 31) % 100) - 50) / 500;
+  return { lat: 30.0444 + latOffset, lng: 31.2357 + lngOffset };
+}
 
 export const CustomerDashboard: React.FC = () => {
   const { user, settings } = useAuth();
@@ -47,6 +92,35 @@ export const CustomerDashboard: React.FC = () => {
 
   const currencyLabel = t('app.egp');
   const distanceUnit = t('app.km');
+
+  // Dynamically extract all unique locations from active Trip Route Pricing
+  const dynamicPopularSpots = React.useMemo(() => {
+    const activeRoutes = (settings?.fixedRoutes || []).filter((r) => r.isActive);
+    const spotSet = new Set<string>();
+
+    activeRoutes.forEach((r) => {
+      if (r.pickupName?.trim()) spotSet.add(r.pickupName.trim());
+      if (r.destinationName?.trim()) spotSet.add(r.destinationName.trim());
+    });
+
+    if (spotSet.size > 0) {
+      return Array.from(spotSet);
+    }
+
+    return [
+      'Tahrir Square (Downtown)',
+      'Cairo Airport Terminal 3',
+      'Citystars Mall (Nasr City)',
+      'Zamalek (Gezira Island)',
+      'New Cairo (5th Settlement)',
+      'Maadi Corniche',
+      'Giza Pyramids',
+    ];
+  }, [settings?.fixedRoutes]);
+
+  const activeFixedRoutes = React.useMemo(() => {
+    return (settings?.fixedRoutes || []).filter((r) => r.isActive);
+  }, [settings?.fixedRoutes]);
 
   // Check if current pickup & destination match any active fixed route
   const findMatchingFixedRoute = (pickup: string, dest: string, routes?: FixedRoutePrice[]): FixedRoutePrice | null => {
@@ -487,31 +561,78 @@ export const CustomerDashboard: React.FC = () => {
               />
             </div>
 
+            {/* Fixed Price Route Packages (1-Tap Origin + Destination) */}
+            {activeFixedRoutes.length > 0 && (
+              <div className="space-y-1.5 pt-0.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-purple-300 font-bold uppercase flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-purple-400" />
+                    <span>{i18n.language === 'ar' ? 'باقات المسارات المعتمدة (تحديد فوري)' : 'Fixed Route Packages (1-Tap)'}</span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeFixedRoutes.map((r) => {
+                    const isSelected =
+                      (pickupAddress === r.pickupName && destAddress === r.destinationName) ||
+                      (r.isBidirectional && pickupAddress === r.destinationName && destAddress === r.pickupName);
+
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => {
+                          setPickupAddress(r.pickupName);
+                          setPickupCoords(getCoordsForLocation(r.pickupName));
+                          setDestAddress(r.destinationName);
+                          setDestCoords(getCoordsForLocation(r.destinationName));
+                        }}
+                        className={`text-[10px] px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? 'bg-purple-600/30 text-purple-200 border-purple-400 font-bold shadow-md shadow-purple-500/20'
+                            : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-800/60 hover:border-purple-600'
+                        }`}
+                      >
+                        <span>{r.pickupName} ⇄ {r.destinationName}</span>
+                        <span className="bg-purple-900/90 text-amber-300 px-1.5 py-0.2 rounded font-mono font-bold text-[9px]">
+                          {r.price} {currencyLabel}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Popular Cairo Spots (Dynamically populated from configured route endpoints) */}
             <div className="space-y-1.5">
               <span className="text-[10px] text-slate-400 uppercase font-bold">
                 {t('customer.popularLocations')}
               </span>
               <div className="flex flex-wrap gap-1.5">
-                {PRESET_LOCATIONS.map((preset, idx) => {
-                  const presetName = i18n.language === 'ar' ? preset.nameAr : preset.nameEn;
-                  const presetAddress = i18n.language === 'ar' ? preset.addressAr : preset.addressEn;
+                {dynamicPopularSpots.map((spot, idx) => {
+                  const isSelected = pickupAddress === spot || destAddress === spot;
 
                   return (
                     <button
                       key={idx}
                       type="button"
                       onClick={() => {
-                        if (!pickupAddress) {
-                          setPickupAddress(presetAddress);
-                          setPickupCoords(preset.coords);
+                        const coords = getCoordsForLocation(spot);
+                        if (!pickupAddress.trim()) {
+                          setPickupAddress(spot);
+                          setPickupCoords(coords);
                         } else {
-                          setDestAddress(presetAddress);
-                          setDestCoords(preset.coords);
+                          setDestAddress(spot);
+                          setDestCoords(coords);
                         }
                       }}
-                      className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/70 hover:border-slate-600 transition-colors"
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60 font-bold'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700/70 hover:border-slate-600'
+                      }`}
                     >
-                      {presetName}
+                      {spot}
                     </button>
                   );
                 })}
