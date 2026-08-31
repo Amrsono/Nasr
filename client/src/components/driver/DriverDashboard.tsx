@@ -3,8 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 import { getSocket, sendDriverStatus } from '../../services/socket';
-import { UnifiedMap } from '../map/UnifiedMap';
-import { Trip, LocationCoords } from '../../types';
+import { Trip } from '../../types';
 import confetti from 'canvas-confetti';
 import {
   Car,
@@ -64,9 +63,6 @@ export const DriverDashboard: React.FC = () => {
 
   // File Upload Reference
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Driver's simulated GPS location
-  const currentCoords: LocationCoords = user?.currentLocation || { lat: 30.0444, lng: 31.2357 };
 
   // Localization Helpers
   const getLocalizedDriverName = (name?: string) => {
@@ -217,6 +213,21 @@ export const DriverDashboard: React.FC = () => {
     } catch (err: any) {
       alert(err.message || (i18n.language === 'ar' ? 'تم قبول الرحلة بواسطة سائق آخر' : 'Trip was already taken by another driver'));
       loadDriverData();
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Flag Reached Pickup Location
+  const handleArrive = async () => {
+    if (!activeTrip) return;
+    setIsProcessing(true);
+    try {
+      const updated = await api.arriveAtPickup(activeTrip.id);
+      setActiveTrip(updated);
+      loadDriverData();
+    } catch (err: any) {
+      alert(err.message || (i18n.language === 'ar' ? 'فشل تسجيل الوصول لنقطة الركوب' : 'Failed to mark reached pickup location'));
     } finally {
       setIsProcessing(false);
     }
@@ -459,18 +470,28 @@ export const DriverDashboard: React.FC = () => {
                 </span>
                 <h2 className="text-lg font-black text-white">
                   {activeTrip.status === 'ACCEPTED' && t('customer.driverAssigned')}
+                  {activeTrip.status === 'ARRIVED' && (
+                    <span className="text-purple-300 flex items-center gap-2">
+                      <MapPin className="w-5 h-5 animate-bounce text-purple-400" />
+                      <span>{t('driver.waitingForCustomer')}</span>
+                    </span>
+                  )}
                   {activeTrip.status === 'PICKED_UP' && t('customer.pickedUp')}
                 </h2>
               </div>
             </div>
 
-            <div className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+            <div className={`px-3 py-1 rounded-full text-xs font-bold border ${
+              activeTrip.status === 'ARRIVED'
+                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 animate-pulse'
+                : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+            }`}>
               {t(`status.${activeTrip.status}`)}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
               <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-700/60 pb-2">
                   <div className="flex items-center gap-2">
@@ -511,10 +532,18 @@ export const DriverDashboard: React.FC = () => {
                     <b>{t('customer.notes')}:</b> {activeTrip.notes}
                   </div>
                 )}
+              </div>
+            </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-700 text-xs">
-                  <span className="text-slate-400">{t('driver.distance')}: <b className="text-slate-200 font-mono">{activeTrip.distanceKm} {distanceUnit}</b></span>
-                  <span className="text-slate-400">{t('driver.estFare')}: <b className="text-emerald-400 text-sm font-mono">{activeTrip.estimatedFare} {currencyLabel}</b></span>
+            <div className="space-y-4 flex flex-col justify-between">
+              <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">{t('driver.distance')}</span>
+                  <p className="text-slate-200 font-mono font-bold text-sm">{activeTrip.distanceKm} {distanceUnit}</p>
+                </div>
+                <div className="text-right rtl:text-left">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">{t('driver.estFare')}</span>
+                  <p className="text-emerald-400 font-mono font-bold text-base">{activeTrip.estimatedFare} {currencyLabel}</p>
                 </div>
               </div>
 
@@ -523,16 +552,44 @@ export const DriverDashboard: React.FC = () => {
                 {activeTrip.status === 'ACCEPTED' && (
                   <div className="space-y-2">
                     <button
-                      onClick={handlePickup}
+                      onClick={handleArrive}
                       disabled={isProcessing}
-                      className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-600/20 active:scale-[0.99] flex items-center justify-center gap-2"
+                      className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-sm shadow-xl shadow-purple-600/20 active:scale-[0.99] flex items-center justify-center gap-2"
                     >
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span>{t('driver.step1Pickup')}</span>
+                      <MapPin className="w-5 h-5" />
+                      <span>{t('driver.step1Arrive')}</span>
                     </button>
                     <p className="text-[11px] text-slate-400 text-center">
-                      {t('driver.step1PickupDesc')}
+                      {t('driver.step1ArriveDesc')}
                     </p>
+                  </div>
+                )}
+
+                {activeTrip.status === 'ARRIVED' && (
+                  <div className="space-y-3">
+                    <div className="bg-purple-950/40 border border-purple-500/30 rounded-2xl p-3 text-center space-y-1">
+                      <div className="text-xs font-bold text-purple-300 flex items-center justify-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+                        <span>{t('driver.waitingForCustomer')}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        {t('driver.waitingForCustomerDesc')}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <button
+                        onClick={handlePickup}
+                        disabled={isProcessing}
+                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-600/20 active:scale-[0.99] flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>{t('driver.step2Pickup')}</span>
+                      </button>
+                      <p className="text-[11px] text-slate-400 text-center">
+                        {t('driver.step2PickupDesc')}
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -544,24 +601,14 @@ export const DriverDashboard: React.FC = () => {
                       className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 text-white font-black text-sm shadow-xl shadow-blue-600/20 active:scale-[0.99] flex items-center justify-center gap-2"
                     >
                       <DollarSign className="w-5 h-5" />
-                      <span>{t('driver.step2Dropoff')}</span>
+                      <span>{t('driver.step3Dropoff')}</span>
                     </button>
                     <p className="text-[11px] text-slate-400 text-center">
-                      {t('driver.step2DropoffDesc')}
+                      {t('driver.step3DropoffDesc')}
                     </p>
                   </div>
                 )}
               </div>
-            </div>
-
-            <div className="lg:col-span-6">
-              <UnifiedMap
-                pickupCoords={activeTrip.pickupCoords}
-                destinationCoords={activeTrip.destinationCoords}
-                driverCoords={currentCoords}
-                height="320px"
-                zoom={13}
-              />
             </div>
           </div>
         </div>

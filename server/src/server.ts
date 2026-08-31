@@ -191,7 +191,7 @@ app.get('/api/trips/queue', authenticate, requireRole('driver', 'admin'), (_req:
 // Active trip for logged in user (customer or driver)
 app.get('/api/trips/active', authenticate, (req: AuthRequest, res) => {
   const user = req.user!;
-  const activeStatuses: TripStatus[] = ['REQUESTED', 'ACCEPTED', 'PICKED_UP'];
+  const activeStatuses: TripStatus[] = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'PICKED_UP'];
 
   let activeTrip: Trip | undefined;
   if (user.role === 'customer') {
@@ -244,6 +244,7 @@ app.post('/api/trips', authenticate, (req: AuthRequest, res) => {
     notes: notes || '',
     createdAt: new Date().toISOString(),
     acceptedAt: null,
+    arrivedAt: null,
     pickedUpAt: null,
     droppedOffAt: null,
     cancelledAt: null,
@@ -293,6 +294,36 @@ app.post('/api/trips/:id/accept', authenticate, requireRole('driver'), (req: Aut
   res.status(500).json({ error: 'Failed to accept trip' });
 });
 
+// Driver Flags "Reached Pickup Location"
+app.post('/api/trips/:id/arrive', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
+  const driver = req.user!;
+  const trip = db.getTripById(req.params.id);
+
+  if (!trip) {
+    return res.status(404).json({ error: 'Trip not found' });
+  }
+
+  if (trip.driverId !== driver.id) {
+    return res.status(403).json({ error: 'You are not the assigned driver for this trip' });
+  }
+
+  if (trip.status !== 'ACCEPTED') {
+    return res.status(400).json({ error: `Cannot mark arrived when trip status is ${trip.status}` });
+  }
+
+  const updatedTrip = db.updateTrip(trip.id, {
+    status: 'ARRIVED',
+    arrivedAt: new Date().toISOString(),
+  });
+
+  if (updatedTrip) {
+    notifyTripUpdated(updatedTrip);
+    return res.json(updatedTrip);
+  }
+
+  res.status(500).json({ error: 'Failed to update trip status to Arrived' });
+});
+
 // Driver Flags "Customer Picked Up"
 app.post('/api/trips/:id/pickup', authenticate, requireRole('driver'), (req: AuthRequest, res) => {
   const driver = req.user!;
@@ -306,7 +337,7 @@ app.post('/api/trips/:id/pickup', authenticate, requireRole('driver'), (req: Aut
     return res.status(403).json({ error: 'You are not the assigned driver for this trip' });
   }
 
-  if (trip.status !== 'ACCEPTED') {
+  if (trip.status !== 'ACCEPTED' && trip.status !== 'ARRIVED') {
     return res.status(400).json({ error: `Cannot pick up customer when trip status is ${trip.status}` });
   }
 
@@ -337,7 +368,7 @@ app.post('/api/trips/:id/dropoff', authenticate, requireRole('driver'), (req: Au
     return res.status(403).json({ error: 'You are not the assigned driver for this trip' });
   }
 
-  if (trip.status !== 'PICKED_UP' && trip.status !== 'ACCEPTED') {
+  if (trip.status !== 'PICKED_UP' && trip.status !== 'ACCEPTED' && trip.status !== 'ARRIVED') {
     return res.status(400).json({ error: `Cannot complete drop-off when trip status is ${trip.status}` });
   }
 
@@ -441,7 +472,7 @@ app.get('/api/admin/metrics', authenticate, requireRole('admin'), (_req: AuthReq
   const customers = allUsers.filter((u) => u.role === 'customer');
 
   const completedTrips = allTrips.filter((t) => t.status === 'DROPPED_OFF');
-  const activeTrips = allTrips.filter((t) => ['REQUESTED', 'ACCEPTED', 'PICKED_UP'].includes(t.status));
+  const activeTrips = allTrips.filter((t) => ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(t.status));
   const cancelledTrips = allTrips.filter((t) => t.status === 'CANCELLED');
 
   const totalRevenue = completedTrips.reduce((sum, t) => sum + (t.finalFare || t.estimatedFare || 0), 0);
@@ -492,7 +523,7 @@ app.get('/api/admin/drivers', authenticate, requireRole('admin'), (_req: AuthReq
       ...d,
       completedTripsCount: completed.length,
       totalEarned: revenue,
-      activeTrip: trips.find((t) => ['ACCEPTED', 'PICKED_UP'].includes(t.status)) || null,
+      activeTrip: trips.find((t) => ['ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(t.status)) || null,
     };
   });
 

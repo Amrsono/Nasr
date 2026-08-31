@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
-import { UnifiedMap } from '../map/UnifiedMap';
 import { Trip, AdminMetrics, DriverWithStats } from '../../types';
 import {
   Shield,
@@ -13,7 +12,6 @@ import {
   Clock,
   Search,
   Settings as SettingsIcon,
-  MapPin,
   Star,
   Key,
   Save,
@@ -142,13 +140,6 @@ export const AdminDashboard: React.FC = () => {
     return matchesStatus && matchesSearch;
   });
 
-  const driverMapList = drivers.map((d) => ({
-    id: d.id,
-    name: getLocalizedDriverName(d.name),
-    coords: d.currentLocation || { lat: 30.0444, lng: 31.2357 },
-    isOnline: d.isOnline,
-  }));
-
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
       {/* Header & Tabs */}
@@ -265,31 +256,9 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* TAB 1: OVERVIEW & LIVE DISPATCH MAP */}
+      {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4 text-left rtl:text-right">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-emerald-400" />
-                  <span>{t('admin.liveMap')}</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">{t('admin.liveMapDesc')}</p>
-              </div>
-              <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                {t('admin.liveGps')}
-              </span>
-            </div>
-
-            <UnifiedMap
-              otherDrivers={driverMapList}
-              height="440px"
-              zoom={12}
-            />
-          </div>
-
           <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4 text-left rtl:text-right">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
@@ -356,6 +325,7 @@ export const AdminDashboard: React.FC = () => {
                 <option value="ALL">{t('admin.all')}</option>
                 <option value="REQUESTED">{t('status.REQUESTED')}</option>
                 <option value="ACCEPTED">{t('status.ACCEPTED')}</option>
+                <option value="ARRIVED">{t('status.ARRIVED')}</option>
                 <option value="PICKED_UP">{t('status.PICKED_UP')}</option>
                 <option value="DROPPED_OFF">{t('status.DROPPED_OFF')}</option>
                 <option value="CANCELLED">{t('status.CANCELLED')}</option>
@@ -415,6 +385,8 @@ export const AdminDashboard: React.FC = () => {
                             ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                             : trip.status === 'REQUESTED'
                             ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
+                            : trip.status === 'ARRIVED'
+                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 animate-pulse'
                             : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                         }`}
                       >

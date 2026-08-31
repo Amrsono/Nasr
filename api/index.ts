@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 const JWT_SECRET = process.env.JWT_SECRET || 'nasr_ride_production_jwt_secret_key_2026';
 
 export type UserRole = 'admin' | 'driver' | 'customer';
-export type TripStatus = 'REQUESTED' | 'ACCEPTED' | 'PICKED_UP' | 'DROPPED_OFF' | 'CANCELLED';
+export type TripStatus = 'REQUESTED' | 'ACCEPTED' | 'ARRIVED' | 'PICKED_UP' | 'DROPPED_OFF' | 'CANCELLED';
 
 export interface LocationCoords {
   lat: number;
@@ -56,6 +56,7 @@ export interface Trip {
   notes?: string;
   createdAt: string;
   acceptedAt?: string | null;
+  arrivedAt?: string | null;
   pickedUpAt?: string | null;
   droppedOffAt?: string | null;
   cancelledAt?: string | null;
@@ -536,7 +537,7 @@ router.get('/trips/queue', authenticate, requireRole('driver', 'admin'), (_req: 
 // Active trip
 router.get('/trips/active', authenticate, (req: AuthRequest, res) => {
   const user = req.user!;
-  const activeStatuses: TripStatus[] = ['REQUESTED', 'ACCEPTED', 'PICKED_UP'];
+  const activeStatuses: TripStatus[] = ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'PICKED_UP'];
 
   let activeTrip: Trip | undefined;
   if (user.role === 'customer') {
@@ -589,6 +590,7 @@ router.post('/trips', authenticate, async (req: AuthRequest, res) => {
     notes: notes || '',
     createdAt: new Date().toISOString(),
     acceptedAt: null,
+    arrivedAt: null,
     pickedUpAt: null,
     droppedOffAt: null,
     cancelledAt: null,
@@ -620,6 +622,25 @@ router.post('/trips/:id/accept', authenticate, requireRole('driver'), async (req
     driverCar: carInfo,
     status: 'ACCEPTED',
     acceptedAt: new Date().toISOString(),
+  });
+
+  res.json(updatedTrip);
+});
+
+// Flag Arrived at Pickup
+router.post('/trips/:id/arrive', authenticate, requireRole('driver'), async (req: AuthRequest, res) => {
+  const driver = req.user!;
+  const trip = db.getTripById(req.params.id);
+
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  if (trip.driverId !== driver.id) return res.status(403).json({ error: 'Not authorized for this trip' });
+  if (trip.status !== 'ACCEPTED') {
+    return res.status(400).json({ error: `Cannot mark arrived when trip status is ${trip.status}` });
+  }
+
+  const updatedTrip = await db.updateTrip(trip.id, {
+    status: 'ARRIVED',
+    arrivedAt: new Date().toISOString(),
   });
 
   res.json(updatedTrip);
@@ -721,7 +742,7 @@ router.get('/admin/metrics', authenticate, requireRole('admin'), (_req: AuthRequ
   const customers = allUsers.filter((u) => u.role === 'customer');
 
   const completedTrips = allTrips.filter((t) => t.status === 'DROPPED_OFF');
-  const activeTrips = allTrips.filter((t) => ['REQUESTED', 'ACCEPTED', 'PICKED_UP'].includes(t.status));
+  const activeTrips = allTrips.filter((t) => ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(t.status));
   const cancelledTrips = allTrips.filter((t) => t.status === 'CANCELLED');
 
   const totalRevenue = completedTrips.reduce((sum, t) => sum + (t.finalFare || t.estimatedFare || 0), 0);
@@ -751,7 +772,7 @@ router.get('/admin/drivers', authenticate, requireRole('admin'), (_req: AuthRequ
   const driversWithStats = drivers.map((d) => {
     const dTrips = allTrips.filter((t) => t.driverId === d.id && t.status === 'DROPPED_OFF');
     const totalEarned = dTrips.reduce((sum, t) => sum + (t.finalFare || t.estimatedFare || 0), 0);
-    const activeTrip = allTrips.find((t) => t.driverId === d.id && ['ACCEPTED', 'PICKED_UP'].includes(t.status)) || null;
+    const activeTrip = allTrips.find((t) => t.driverId === d.id && ['ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(t.status)) || null;
 
     return {
       ...d,

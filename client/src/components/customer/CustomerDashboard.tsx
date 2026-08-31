@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
-import { UnifiedMap } from '../map/UnifiedMap';
 import { Trip, LocationCoords } from '../../types';
 import confetti from 'canvas-confetti';
 import {
@@ -43,10 +42,8 @@ export const CustomerDashboard: React.FC = () => {
   );
   const [destCoords, setDestCoords] = useState<LocationCoords>({ lat: 30.0735, lng: 31.3456 });
 
-  const [mapMode, setMapMode] = useState<'pickup' | 'destination' | 'view'>('view');
   const [notes, setNotes] = useState('');
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
-  const [driverLocation, setDriverLocation] = useState<LocationCoords | null>(null);
   const [recentTrips, setRecentTrips] = useState<Trip[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedRating, setSelectedRating] = useState(5);
@@ -84,7 +81,7 @@ export const CustomerDashboard: React.FC = () => {
       ]);
 
       setActiveTrip((prev) => {
-        if (!active && prev && ['REQUESTED', 'ACCEPTED', 'PICKED_UP'].includes(prev.status)) {
+        if (!active && prev && ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(prev.status)) {
           const fromHistory = history.find((t) => t.id === prev.id);
           if (fromHistory) {
             if (fromHistory.status === 'DROPPED_OFF' || fromHistory.status === 'CANCELLED') {
@@ -115,6 +112,12 @@ export const CustomerDashboard: React.FC = () => {
     const handleTripUpdate = (updatedTrip: Trip) => {
       if (updatedTrip.customerId === user?.id) {
         setActiveTrip((prev) => {
+          if (updatedTrip.status === 'ARRIVED' && prev?.status !== 'ARRIVED') {
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+              audio.play().catch(() => {});
+            } catch (e) {}
+          }
           if (updatedTrip.status === 'DROPPED_OFF' && prev?.status !== 'DROPPED_OFF') {
             confetti({
               particleCount: 80,
@@ -131,18 +134,10 @@ export const CustomerDashboard: React.FC = () => {
       }
     };
 
-    const handleDriverLocation = (data: { tripId: string; coords: LocationCoords }) => {
-      if (activeTrip && activeTrip.id === data.tripId) {
-        setDriverLocation(data.coords);
-      }
-    };
-
     socket.on('trip:updated', handleTripUpdate);
-    socket.on('trip:driver_location', handleDriverLocation);
 
     return () => {
       socket.off('trip:updated', handleTripUpdate);
-      socket.off('trip:driver_location', handleDriverLocation);
     };
   }, [user, activeTrip]);
 
@@ -224,8 +219,8 @@ export const CustomerDashboard: React.FC = () => {
           </h1>
           <p className="text-slate-400 text-xs mt-1">
             {i18n.language === 'ar'
-              ? 'حدد نقطة الانطلاق والوصول على الخريطة التفاعلية لحجز رحلتك فوراً'
-              : 'Pin your pickup and destination on the interactive map to connect with a nearby driver.'}
+              ? 'حدد نقطة الانطلاق والوصول لحجز رحلتك فوراً'
+              : 'Enter your pickup and destination to connect with a nearby driver.'}
           </p>
         </div>
 
@@ -261,6 +256,11 @@ export const CustomerDashboard: React.FC = () => {
                       <Car className="w-5 h-5 animate-bounce" /> {t('customer.driverAssigned')}
                     </span>
                   )}
+                  {activeTrip.status === 'ARRIVED' && (
+                    <span className="text-purple-400 flex items-center gap-2">
+                      <MapPin className="w-5 h-5 animate-bounce" /> {t('customer.driverArrived')}
+                    </span>
+                  )}
                   {activeTrip.status === 'PICKED_UP' && (
                     <span className="text-emerald-400 flex items-center gap-2">
                       <Navigation className="w-5 h-5 animate-pulse" /> {t('customer.pickedUp')}
@@ -285,6 +285,26 @@ export const CustomerDashboard: React.FC = () => {
               </button>
             )}
           </div>
+
+          {/* Driver Arrived Notification Alert Banner */}
+          {activeTrip.status === 'ARRIVED' && (
+            <div className="bg-gradient-to-r from-purple-950/90 to-slate-900 border-2 border-purple-500 rounded-2xl p-4 flex items-center gap-4 text-left rtl:text-right shadow-xl shadow-purple-950/40 animate-pulse">
+              <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-300 shrink-0">
+                <MapPin className="w-6 h-6 animate-bounce" />
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-black text-white flex items-center gap-2">
+                  <span>{t('customer.driverArrived')}</span>
+                  <span className="text-[10px] bg-purple-500/30 text-purple-200 px-2 py-0.5 rounded-full border border-purple-400/40 font-bold">
+                    {t('status.ARRIVED')}
+                  </span>
+                </div>
+                <p className="text-xs text-purple-200 mt-1">
+                  {t('customer.driverArrivedDesc')}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Active Trip Details Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -402,161 +422,112 @@ export const CustomerDashboard: React.FC = () => {
       )}
 
       {/* MAIN BOOKING INTERFACE */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-5 space-y-5">
-          <div className="bg-slate-900/90 rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-xl space-y-5 text-left rtl:text-right">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Navigation className="w-4 h-4 text-emerald-400" />
-              <span>{t('customer.bookRide')}</span>
-            </h2>
+      <div className="max-w-2xl mx-auto w-full">
+        <div className="bg-slate-900/90 rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-xl space-y-5 text-left rtl:text-right">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <Navigation className="w-4 h-4 text-emerald-400" />
+            <span>{t('customer.bookRide')}</span>
+          </h2>
 
-            <form onSubmit={handleRequestRide} className="space-y-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                    {t('customer.pickupLocation')}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setMapMode(mapMode === 'pickup' ? 'view' : 'pickup')}
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border transition-all ${
-                      mapMode === 'pickup'
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20'
-                        : 'bg-slate-800 text-emerald-400 border-slate-700 hover:bg-slate-700'
-                    }`}
-                  >
-                    {mapMode === 'pickup' ? '✓ ' + t('customer.pinOnMap') : t('customer.pinOnMap')}
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={pickupAddress}
-                  onChange={(e) => setPickupAddress(e.target.value)}
-                  placeholder={t('customer.searchAddress')}
-                  className="w-full bg-slate-800/80 border border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-all text-left rtl:text-right"
-                  required
-                />
+          <form onSubmit={handleRequestRide} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                {t('customer.pickupLocation')}
+              </label>
+              <input
+                type="text"
+                value={pickupAddress}
+                onChange={(e) => setPickupAddress(e.target.value)}
+                placeholder={t('customer.searchAddress')}
+                className="w-full bg-slate-800/80 border border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-all text-left rtl:text-right"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                {t('customer.dropoffLocation')}
+              </label>
+              <input
+                type="text"
+                value={destAddress}
+                onChange={(e) => setDestAddress(e.target.value)}
+                placeholder={t('customer.searchAddress')}
+                className="w-full bg-slate-800/80 border border-slate-700 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-all text-left rtl:text-right"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-[10px] text-slate-400 uppercase font-bold">
+                {t('customer.popularLocations')}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {PRESET_LOCATIONS.map((preset, idx) => {
+                  const presetName = i18n.language === 'ar' ? preset.nameAr : preset.nameEn;
+                  const presetAddress = i18n.language === 'ar' ? preset.addressAr : preset.addressEn;
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        if (!pickupAddress) {
+                          setPickupAddress(presetAddress);
+                          setPickupCoords(preset.coords);
+                        } else {
+                          setDestAddress(presetAddress);
+                          setDestCoords(preset.coords);
+                        }
+                      }}
+                      className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/70 hover:border-slate-600 transition-colors"
+                    >
+                      {presetName}
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-rose-400" />
-                    {t('customer.dropoffLocation')}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setMapMode(mapMode === 'destination' ? 'view' : 'destination')}
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border transition-all ${
-                      mapMode === 'destination'
-                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                        : 'bg-slate-800 text-rose-400 border-slate-700 hover:bg-slate-700'
-                    }`}
-                  >
-                    {mapMode === 'destination' ? '✓ ' + t('customer.pinOnMap') : t('customer.pinOnMap')}
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={destAddress}
-                  onChange={(e) => setDestAddress(e.target.value)}
-                  placeholder={t('customer.searchAddress')}
-                  className="w-full bg-slate-800/80 border border-slate-700 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-all text-left rtl:text-right"
-                  required
-                />
+            <div className="space-y-1.5">
+              <label className="text-xs text-slate-300 font-semibold">{t('customer.notes')}</label>
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={t('customer.notesPlaceholder')}
+                className="w-full bg-slate-800/80 border border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition-all resize-none text-left rtl:text-right"
+              />
+            </div>
+
+            <div className="bg-slate-800/90 rounded-2xl p-4 border border-slate-700 flex items-center justify-between text-xs">
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.distance')}</div>
+                <div className="text-sm font-bold text-slate-200 font-mono">{distanceKm} {distanceUnit}</div>
               </div>
-
-              <div className="space-y-1.5">
-                <span className="text-[10px] text-slate-400 uppercase font-bold">
-                  {t('customer.popularLocations')}
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {PRESET_LOCATIONS.map((preset, idx) => {
-                    const presetName = i18n.language === 'ar' ? preset.nameAr : preset.nameEn;
-                    const presetAddress = i18n.language === 'ar' ? preset.addressAr : preset.addressEn;
-
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          if (mapMode === 'pickup') {
-                            setPickupAddress(presetAddress);
-                            setPickupCoords(preset.coords);
-                          } else {
-                            setDestAddress(presetAddress);
-                            setDestCoords(preset.coords);
-                          }
-                        }}
-                        className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/70 hover:border-slate-600 transition-colors"
-                      >
-                        {presetName}
-                      </button>
-                    );
-                  })}
+              <div className="text-right rtl:text-left">
+                <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.estCost')}</div>
+                <div className="text-lg font-black text-emerald-400 font-mono">
+                  {estimatedFare} <span className="text-xs font-sans">{currencyLabel}</span>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-300 font-semibold">{t('customer.notes')}</label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder={t('customer.notesPlaceholder')}
-                  className="w-full bg-slate-800/80 border border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition-all resize-none text-left rtl:text-right"
-                />
-              </div>
-
-              <div className="bg-slate-800/90 rounded-2xl p-4 border border-slate-700 flex items-center justify-between text-xs">
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.distance')}</div>
-                  <div className="text-sm font-bold text-slate-200 font-mono">{distanceKm} {distanceUnit}</div>
-                </div>
-                <div className="text-right rtl:text-left">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.estCost')}</div>
-                  <div className="text-lg font-black text-emerald-400 font-mono">
-                    {estimatedFare} <span className="text-xs font-sans">{currencyLabel}</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting || !!activeTrip}
-                className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
-                  activeTrip
-                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                    : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 shadow-emerald-500/20 active:scale-[0.99]'
-                }`}
-              >
-                <Car className="w-4 h-4" />
-                <span>{isSubmitting ? t('common.loading') : t('customer.requestRide')}</span>
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <div className="lg:col-span-7 space-y-4">
-          <div className="bg-slate-900/90 rounded-3xl p-3 border border-slate-800 shadow-xl">
-            <UnifiedMap
-              pickupCoords={pickupCoords}
-              destinationCoords={destCoords}
-              driverCoords={driverLocation}
-              activeMode={mapMode}
-              onPickupChange={(coords) => {
-                setPickupCoords(coords);
-                setPickupAddress(i18n.language === 'ar' ? `موقع محدد (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})` : `Pinned Location (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
-              }}
-              onDestinationChange={(coords) => {
-                setDestCoords(coords);
-                setDestAddress(i18n.language === 'ar' ? `موقع محدد (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})` : `Pinned Location (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
-              }}
-              height="480px"
-              zoom={12}
-            />
-          </div>
+            <button
+              type="submit"
+              disabled={isSubmitting || !!activeTrip}
+              className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl transition-all ${
+                activeTrip
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                  : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 shadow-emerald-500/20 active:scale-[0.99]'
+              }`}
+            >
+              <Car className="w-4 h-4" />
+              <span>{isSubmitting ? t('common.loading') : t('customer.requestRide')}</span>
+            </button>
+          </form>
         </div>
       </div>
 

@@ -333,7 +333,7 @@ export const api = {
     const uid = getCurrentUserId();
     const db = getLocalDB();
     const active = db.trips.find(
-      (t) => (t.customerId === uid || t.driverId === uid) && ['REQUESTED', 'ACCEPTED', 'PICKED_UP'].includes(t.status)
+      (t) => (t.customerId === uid || t.driverId === uid) && ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(t.status)
     );
     return active || null;
   },
@@ -385,6 +385,7 @@ export const api = {
       notes: data.notes || '',
       createdAt: new Date().toISOString(),
       acceptedAt: null,
+      arrivedAt: null,
       pickedUpAt: null,
       droppedOffAt: null,
       cancelledAt: null,
@@ -421,6 +422,30 @@ export const api = {
       driverCar: driver.carDetails ? `${driver.carDetails.model} - ${driver.carDetails.plate}` : 'Toyota Corolla',
       status: 'ACCEPTED',
       acceptedAt: new Date().toISOString(),
+    };
+    saveLocalDB(db);
+    return db.trips[idx];
+  },
+
+  async arriveAtPickup(tripId: string): Promise<Trip> {
+    try {
+      const res = await fetch(`${API_BASE}/trips/${tripId}/arrive`, {
+        method: 'POST',
+        headers: getHeaders(),
+      });
+      if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
+        return res.json();
+      }
+    } catch {}
+
+    const db = getLocalDB();
+    const idx = db.trips.findIndex((t) => t.id === tripId);
+    if (idx === -1) throw new Error('Trip not found');
+
+    db.trips[idx] = {
+      ...db.trips[idx],
+      status: 'ARRIVED',
+      arrivedAt: new Date().toISOString(),
     };
     saveLocalDB(db);
     return db.trips[idx];
@@ -550,7 +575,7 @@ export const api = {
 
     const db = getLocalDB();
     const completed = db.trips.filter((t) => t.status === 'DROPPED_OFF');
-    const active = db.trips.filter((t) => ['REQUESTED', 'ACCEPTED', 'PICKED_UP'].includes(t.status));
+    const active = db.trips.filter((t) => ['REQUESTED', 'ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(t.status));
     const revenue = completed.reduce((sum, t) => sum + (t.finalFare || t.estimatedFare || 0), 0);
     const distance = completed.reduce((sum, t) => sum + (t.distanceKm || 0), 0);
 
@@ -585,7 +610,7 @@ export const api = {
       ...d,
       completedTripsCount: d.totalTrips || 0,
       totalEarned: d.totalEarnings || 0,
-      activeTrip: db.trips.find((t) => t.driverId === d.id && ['ACCEPTED', 'PICKED_UP'].includes(t.status)) || null,
+      activeTrip: db.trips.find((t) => t.driverId === d.id && ['ACCEPTED', 'ARRIVED', 'PICKED_UP'].includes(t.status)) || null,
     }));
   },
 

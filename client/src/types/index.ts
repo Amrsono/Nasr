@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'driver' | 'customer';
 
-export type TripStatus = 'REQUESTED' | 'ACCEPTED' | 'PICKED_UP' | 'DROPPED_OFF' | 'CANCELLED';
+export type TripStatus = 'REQUESTED' | 'ACCEPTED' | 'ARRIVED' | 'PICKED_UP' | 'DROPPED_OFF' | 'CANCELLED';
 
 export interface LocationCoords {
   lat: number;
@@ -48,6 +48,7 @@ export interface Trip {
   notes?: string;
   createdAt: string;
   acceptedAt?: string | null;
+  arrivedAt?: string | null;
   pickedUpAt?: string | null;
   droppedOffAt?: string | null;
   cancelledAt?: string | null;
