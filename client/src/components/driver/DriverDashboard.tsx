@@ -59,10 +59,14 @@ export const DriverDashboard: React.FC = () => {
   const [carColorInput, setCarColorInput] = useState(user?.carDetails?.color || '');
   const [avatarInput, setAvatarInput] = useState(user?.avatar || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingDirect, setIsUploadingDirect] = useState(false);
   const [profileSuccessMessage, setProfileSuccessMessage] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // File Upload Reference
+  // File Upload References
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const quickFileInputRef = useRef<HTMLInputElement>(null);
 
   // Localization Helpers
   const getLocalizedDriverName = (name?: string) => {
@@ -279,44 +283,96 @@ export const DriverDashboard: React.FC = () => {
     }
   };
 
-  // Handle Local Photo File Selection from Phone/Device
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Client-side image compression to high-quality 320x320 JPEG
+  const compressImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        return reject(new Error('Selected file is not an image'));
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 320;
+          let width = img.width;
+          let height = img.height;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 320;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
+          // Square crop or proportion scale
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return resolve(event.target?.result as string);
+          }
           ctx.drawImage(img, 0, 0, width, height);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-          setAvatarInput(dataUrl);
-        }
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = event.target?.result as string;
       };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Instant direct avatar upload from header
+  const handleQuickAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingDirect(true);
+    try {
+      const dataUrl = await compressImageFile(file);
+      setAvatarInput(dataUrl);
+      await api.updateMe({ avatar: dataUrl });
+      await refreshUser();
+      setToastMessage(t('driver.avatarUploaded'));
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload photo');
+    } finally {
+      setIsUploadingDirect(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Handle Photo File Selection in Edit Modal
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageFile(file);
+      setAvatarInput(dataUrl);
+    } catch (err: any) {
+      alert(err.message || 'Failed to process image');
+    }
+  };
+
+  // Drag and drop for modal
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageFile(file);
+      setAvatarInput(dataUrl);
+    } catch (err: any) {
+      alert(err.message || 'Failed to process image');
+    }
   };
 
   // Save Driver Profile Changes
@@ -336,9 +392,11 @@ export const DriverDashboard: React.FC = () => {
       });
       await refreshUser();
       setProfileSuccessMessage(true);
+      setToastMessage(t('driver.profileSaved'));
       setTimeout(() => {
         setProfileSuccessMessage(false);
         setShowEditProfileModal(false);
+        setToastMessage(null);
       }, 1200);
     } catch (err: any) {
       alert(err.message || (i18n.language === 'ar' ? 'فشل حفظ التعديلات' : 'Failed to update profile'));
@@ -349,21 +407,56 @@ export const DriverDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
-      {/* Top Driver Bar with Edit Profile Button */}
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-bounce">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Hidden Quick File Input for Direct Avatar Upload */}
+      <input
+        type="file"
+        ref={quickFileInputRef}
+        onChange={handleQuickAvatarUpload}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Top Driver Bar with Direct Avatar Upload & Profile Edit Button */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="relative group">
+          <div
+            className="relative group cursor-pointer"
+            onClick={() => quickFileInputRef.current?.click()}
+            title={t('driver.uploadPhoto')}
+          >
             <img
               src={user?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.name}`}
               alt={user?.name}
-              className="w-16 h-16 rounded-2xl border-2 border-blue-500/40 object-cover bg-slate-800 shadow-lg"
+              className={`w-16 h-16 rounded-2xl border-2 object-cover bg-slate-800 shadow-lg transition-all ${
+                isUploadingDirect
+                  ? 'opacity-50 border-blue-500 animate-pulse'
+                  : 'border-blue-500/50 group-hover:border-blue-400 group-hover:scale-105'
+              }`}
             />
+            {/* Camera Overlay on Hover */}
+            <div className="absolute inset-0 bg-slate-950/60 rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-white">
+              <Camera className="w-5 h-5 text-blue-300 drop-shadow" />
+              <span className="text-[8px] font-bold mt-0.5">{t('driver.changeAvatar')}</span>
+            </div>
+
             <button
-              onClick={() => setShowEditProfileModal(true)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                quickFileInputRef.current?.click();
+              }}
               className="absolute -bottom-1 -right-1 rtl:-left-1 rtl:right-auto p-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-transform hover:scale-110"
-              title={t('driver.editProfile')}
+              title={t('driver.uploadPhoto')}
             >
-              <Edit3 className="w-3.5 h-3.5" />
+              <Camera className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -375,7 +468,7 @@ export const DriverDashboard: React.FC = () => {
               </span>
               <button
                 onClick={() => setShowEditProfileModal(true)}
-                className="flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2.5 py-0.5 rounded-lg transition-all"
+                className="flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2.5 py-0.5 rounded-lg transition-all cursor-pointer"
               >
                 <Edit3 className="w-3 h-3" />
                 <span>{t('driver.editProfile')}</span>
@@ -798,69 +891,88 @@ export const DriverDashboard: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
-              {/* Profile Avatar Selection */}
-              <div className="space-y-2.5">
-                <label className="text-xs font-semibold text-slate-300 block">
-                  {t('driver.avatar')}
-                </label>
-                
-                {/* Current Avatar Preview & Preset picker */}
-                <div className="flex items-center gap-3 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
-                  <div className="relative group">
+              {/* Profile Avatar Upload Section */}
+              <div className="space-y-3 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-blue-400" />
+                    <span>{t('driver.uploadAvatar')}</span>
+                  </label>
+                  {avatarInput && avatarInput.startsWith('data:image') && (
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">
+                      {i18n.language === 'ar' ? 'صورة مخصصة مرفوعة ✓' : 'Custom Photo Uploaded ✓'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Drag and Drop / File Input Box */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative p-4 rounded-2xl border-2 border-dashed transition-all flex flex-col sm:flex-row items-center gap-4 cursor-pointer ${
+                    isDragging
+                      ? 'border-blue-400 bg-blue-500/20 scale-[1.01]'
+                      : 'border-blue-500/40 hover:border-blue-400 bg-slate-900/60 hover:bg-slate-900/90'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
+
+                  {/* Avatar Preview */}
+                  <div className="relative group shrink-0">
                     <img
                       src={avatarInput || `https://api.dicebear.com/7.x/bottts/svg?seed=${nameInput}`}
                       alt="Preview"
-                      className="w-16 h-16 rounded-2xl border-2 border-blue-500/50 object-cover bg-slate-900 shrink-0 shadow-md"
+                      className="w-16 h-16 rounded-2xl border-2 border-blue-500/60 object-cover bg-slate-950 shadow-lg transition-transform group-hover:scale-105"
                     />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 rounded-2xl flex items-center justify-center transition-opacity"
-                    >
-                      <Camera className="w-5 h-5 text-white" />
-                    </button>
+                    <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 rounded-2xl flex flex-col items-center justify-center transition-opacity text-white">
+                      <Camera className="w-5 h-5 text-blue-300" />
+                    </div>
                   </div>
 
-                  <div className="flex-1 space-y-1.5">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                      {t('driver.avatarPresets')}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {AVATAR_PRESETS.map((preset, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setAvatarInput(preset)}
-                          className={`w-7 h-7 rounded-lg overflow-hidden border-2 transition-all ${
-                            avatarInput === preset
-                              ? 'border-blue-500 scale-110 shadow-md shadow-blue-500/30'
-                              : 'border-slate-700 hover:border-slate-500 opacity-70 hover:opacity-100'
-                          }`}
-                        >
-                          <img src={preset} alt="preset" className="w-full h-full object-cover" />
-                        </button>
-                      ))}
+                  <div className="flex-1 text-center sm:text-left rtl:sm:text-right space-y-1">
+                    <div className="text-xs font-bold text-blue-300 flex items-center justify-center sm:justify-start rtl:sm:justify-end gap-1.5">
+                      <UploadCloud className="w-4 h-4 text-blue-400" />
+                      <span>{t('driver.uploadPhoto')}</span>
                     </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {t('driver.locatePictureDesc')}
+                    </p>
                   </div>
                 </div>
 
-                {/* LOCATE PICTURE FROM PHONE / DEVICE STORAGE */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageFileChange}
-                  accept="image/*"
-                  className="hidden"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30 border-2 border-dashed border-blue-500/50 hover:border-blue-400 text-blue-300 font-bold text-xs flex items-center justify-center gap-2.5 transition-all shadow-sm active:scale-[0.99]"
-                >
-                  <UploadCloud className="w-4 h-4 text-blue-400" />
-                  <span>{t('driver.locatePicture')}</span>
-                </button>
+                {/* Presets List */}
+                <div className="pt-2 border-t border-slate-700/50 space-y-1.5">
+                  <span className="text-[11px] text-slate-400 font-semibold block">
+                    {t('driver.avatarPresets')}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {AVATAR_PRESETS.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setAvatarInput(preset)}
+                        className={`w-8 h-8 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                          avatarInput === preset
+                            ? 'border-blue-500 scale-110 shadow-md shadow-blue-500/40'
+                            : 'border-slate-700 hover:border-slate-500 opacity-60 hover:opacity-100 hover:scale-105'
+                        }`}
+                      >
+                        <img src={preset} alt="preset" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Name & Phone */}
