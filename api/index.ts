@@ -198,45 +198,100 @@ const getInitialSeed = (): DatabaseSchema => {
 const globalDb: { db: DatabaseSchema } = (global as any)._nasr_db || { db: getInitialSeed() };
 (global as any)._nasr_db = globalDb;
 
+// Vercel KV / Upstash Cloud Database Sync
+async function syncFromCloud(): Promise<void> {
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!kvUrl || !kvToken) return;
+
+  try {
+    const res = await fetch(`${kvUrl}/get/nasr_db`, {
+      headers: { Authorization: `Bearer ${kvToken}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.result) {
+        const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+        if (parsed.users && Array.isArray(parsed.trips)) {
+          globalDb.db = parsed;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Vercel KV syncFromCloud error:', e);
+  }
+}
+
+async function syncToCloud(): Promise<void> {
+  const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!kvUrl || !kvToken) return;
+
+  try {
+    await fetch(`${kvUrl}/set/nasr_db`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${kvToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(JSON.stringify(globalDb.db)),
+    });
+  } catch (e) {
+    console.error('Vercel KV syncToCloud error:', e);
+  }
+}
+
 const db = {
   getUsers: () => globalDb.db.users,
   getUserById: (id: string) => globalDb.db.users.find((u) => u.id === id),
   getUserByEmail: (email: string) => globalDb.db.users.find((u) => u.email.toLowerCase() === email.toLowerCase()),
   createUser: (user: User) => {
     globalDb.db.users.push(user);
+    syncToCloud();
     return user;
   },
   updateUser: (id: string, updates: Partial<User>) => {
     const idx = globalDb.db.users.findIndex((u) => u.id === id);
     if (idx === -1) return undefined;
     globalDb.db.users[idx] = { ...globalDb.db.users[idx], ...updates };
+    syncToCloud();
     return globalDb.db.users[idx];
   },
   getTrips: () => [...globalDb.db.trips].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   getTripById: (id: string) => globalDb.db.trips.find((t) => t.id === id),
   createTrip: (trip: Trip) => {
     globalDb.db.trips.unshift(trip);
+    syncToCloud();
     return trip;
   },
   updateTrip: (id: string, updates: Partial<Trip>) => {
     const idx = globalDb.db.trips.findIndex((t) => t.id === id);
     if (idx === -1) return undefined;
     globalDb.db.trips[idx] = { ...globalDb.db.trips[idx], ...updates };
+    syncToCloud();
     return globalDb.db.trips[idx];
   },
   getSettings: () => globalDb.db.settings,
   updateSettings: (settings: Partial<SystemSettings>) => {
     globalDb.db.settings = { ...globalDb.db.settings, ...settings };
+    syncToCloud();
     return globalDb.db.settings;
   },
   reset: () => {
     globalDb.db = getInitialSeed();
+    syncToCloud();
   },
 };
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Auto-sync with Vercel KV on every incoming request
+app.use(async (_req, _res, next) => {
+  await syncFromCloud();
+  next();
+});
 
 interface AuthRequest extends Request {
   user?: User;
@@ -291,7 +346,12 @@ const router = express.Router();
 
 // Health Check
 router.get('/health', (_req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString(), app: 'Nasr Ride Vercel Serverless' });
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    app: 'Nasr Ride Vercel Serverless',
+    database: process.env.KV_REST_API_URL ? 'Vercel KV Connected' : 'In-Memory Serverless Cache',
+  });
 });
 
 // Demo accounts endpoint
