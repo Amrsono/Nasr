@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { Car, User as UserIcon, Lock, Mail, Phone, Globe, Loader2, Sparkles } from 'lucide-react';
+import { Car, User as UserIcon, Lock, Phone, Globe, Loader2, Sparkles } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
   const { login, register } = useAuth();
@@ -35,12 +35,18 @@ export const AuthPage: React.FC = () => {
       if (mode === 'login') {
         await login(email, password);
       } else {
+        const cleanPhone = phone.trim();
+        const cleanName = name.trim();
+        const digitsPhone = cleanPhone.replace(/[^0-9]/g, '');
+        const autoEmail = digitsPhone ? `${digitsPhone}@nasr.com` : `${cleanName.replace(/\s+/g, '').toLowerCase() || 'user'}@nasr.com`;
+        const registrationEmail = (email && email.trim()) ? email.trim() : autoEmail;
+
         await register({
-          name,
-          email,
+          name: cleanName,
+          email: registrationEmail,
           password,
           role,
-          phone,
+          phone: cleanPhone,
           carDetails:
             role === 'driver'
               ? {
@@ -52,7 +58,7 @@ export const AuthPage: React.FC = () => {
         });
       }
     } catch (err: any) {
-      setError(err.message || (i18n.language === 'ar' ? 'فشل تسجيل الدخول. يرجى التأكد من البيانات.' : 'Authentication failed. Please check your credentials.'));
+      setError(err.message || (i18n.language === 'ar' ? 'فشل إتمام العملية. يرجى التأكد من البيانات.' : 'Authentication failed. Please check your credentials.'));
     } finally {
       setIsLoading(false);
     }
@@ -98,8 +104,10 @@ export const AuthPage: React.FC = () => {
             </h1>
             <p className="text-xs text-slate-400">
               {mode === 'login'
-                ? (i18n.language === 'ar' ? 'أدخل بريدك الإلكتروني وكلمة المرور للمتابعة' : 'Enter your email and password to access your portal')
-                : (i18n.language === 'ar' ? 'قم بإنشاء حساب جديد كعميل أو سائق في المنصة' : 'Create a new customer or driver account')}
+                ? (i18n.language === 'ar' ? 'أدخل رقم هاتفك أو اسم المستخدم أو البريد وكلمة المرور' : 'Enter your mobile number, username, or email to access your account')
+                : (role === 'customer'
+                    ? (i18n.language === 'ar' ? 'أدخل اسم المستخدم ورقم الموبايل وكلمة المرور فقط' : 'Enter your username, mobile number, and password to sign up')
+                    : (i18n.language === 'ar' ? 'قم بإنشاء حساب سائق جديد في المنصة' : 'Create a new driver account'))}
             </p>
           </div>
 
@@ -143,8 +151,9 @@ export const AuthPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'register' && (
+            {mode === 'register' ? (
               <>
+                {/* Role Switcher */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-300">{t('auth.role')}</label>
                   <div className="grid grid-cols-2 gap-3">
@@ -175,18 +184,23 @@ export const AuthPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Username Input */}
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">{t('auth.fullName')}</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={i18n.language === 'ar' ? 'الاسم بالكامل' : 'Your Full Name'}
-                    className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none text-left rtl:text-right"
-                    required
-                  />
+                  <label className="text-xs font-semibold text-slate-300">{t('auth.username')}</label>
+                  <div className="relative">
+                    <UserIcon className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3.5 rtl:right-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={i18n.language === 'ar' ? 'اسم المستخدم (مثال: أحمد الشناوي)' : 'e.g. John Doe / username'}
+                      className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none text-left rtl:text-right"
+                      required
+                    />
+                  </div>
                 </div>
 
+                {/* Mobile Number Input */}
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-300">{t('auth.phone')}</label>
                   <div className="relative">
@@ -195,12 +209,14 @@ export const AuthPage: React.FC = () => {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+20 100 123 4567"
+                      placeholder={i18n.language === 'ar' ? 'رقم الموبايل (مثال: 01012345678)' : '+20 100 123 4567'}
                       className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-mono text-left rtl:text-right"
+                      required
                     />
                   </div>
                 </div>
 
+                {/* Driver-Specific Vehicle Details */}
                 {role === 'driver' && (
                   <div className="space-y-3 bg-slate-800/40 p-3.5 rounded-2xl border border-slate-700/60">
                     <div className="text-[11px] font-bold text-blue-400 uppercase">
@@ -233,40 +249,58 @@ export const AuthPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Password Input */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">{t('auth.password')}</label>
+                  <div className="relative">
+                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3.5 rtl:right-3.5 top-3" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none text-left"
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Login Identifier (Email / Phone / Username) */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">{t('auth.identifier')}</label>
+                  <div className="relative">
+                    <UserIcon className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3.5 rtl:right-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={i18n.language === 'ar' ? 'رقم الموبايل أو اسم المستخدم أو البريد' : 'Mobile number, username, or email'}
+                      className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none text-left rtl:text-right"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">{t('auth.password')}</label>
+                  <div className="relative">
+                    <Lock className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3.5 rtl:right-3.5 top-3" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none text-left"
+                      required
+                    />
+                  </div>
+                </div>
               </>
             )}
-
-            {/* Email */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">{t('auth.email')}</label>
-              <div className="relative">
-                <Mail className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3.5 rtl:right-3.5 top-3" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none text-left"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">{t('auth.password')}</label>
-              <div className="relative">
-                <Lock className="w-3.5 h-3.5 text-slate-400 absolute ltr:left-3.5 rtl:right-3.5 top-3" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-xl ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none text-left"
-                  required
-                />
-              </div>
-            </div>
 
             <button
               type="submit"

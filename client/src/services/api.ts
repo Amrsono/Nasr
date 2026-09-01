@@ -244,7 +244,13 @@ export const api = {
 
     // Fallback: Local Authentication
     const db = getLocalDB();
-    let user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+    const cleanDigits = cleanEmail.replace(/[^0-9]/g, '');
+    let user = db.users.find(
+      (u) =>
+        u.email.toLowerCase() === cleanEmail ||
+        u.name.toLowerCase() === cleanEmail ||
+        (cleanDigits && u.phone && u.phone.replace(/[^0-9]/g, '') === cleanDigits)
+    );
     if (!user) {
       if (cleanEmail === 'admin@nasr.com') {
         user = DEFAULT_USERS[0];
@@ -254,9 +260,9 @@ export const api = {
         user = {
           id: `user_${Date.now()}`,
           name: cleanEmail.split('@')[0],
-          email: cleanEmail,
+          email: cleanEmail.includes('@') ? cleanEmail : `${cleanEmail}@nasr.com`,
           role: 'customer',
-          phone: '+20 100 000 0000',
+          phone: cleanDigits || '+20 100 000 0000',
           createdAt: new Date().toISOString(),
         };
         db.users.push(user);
@@ -285,7 +291,12 @@ export const api = {
 
     // Fallback: Local Registration
     const db = getLocalDB();
-    const cleanEmail = (data.email || '').trim().toLowerCase();
+    const cleanDigits = (data.phone || '').replace(/[^0-9]/g, '');
+    const cleanEmail = (
+      data.email ||
+      (cleanDigits ? `${cleanDigits}@nasr.com` : `${(data.name || 'user').replace(/\s+/g, '').toLowerCase()}@nasr.com`)
+    ).trim().toLowerCase();
+
     const newUser: User = {
       id: `user_${Date.now()}`,
       name: data.name || 'User',

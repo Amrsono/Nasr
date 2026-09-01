@@ -490,18 +490,31 @@ router.get('/auth/demo-users', (_req, res) => {
 // Login
 router.post('/auth/login', (req, res) => {
   const { email, password } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
+  const identifier = (email || req.body.identifier || req.body.username || req.body.phone || '').toString().trim();
+  if (!identifier) {
+    return res.status(400).json({ error: 'Username, mobile number, or email is required' });
   }
 
-  const cleanEmail = email.trim().toLowerCase();
-  const user = db.getUserByEmail(cleanEmail);
+  const cleanId = identifier.toLowerCase();
+  const digitsPhone = identifier.replace(/[^0-9]/g, '');
+
+  const user = db.getUsers().find((u) => {
+    if (u.email && u.email.toLowerCase() === cleanId) return true;
+    if (u.name && u.name.toLowerCase() === cleanId) return true;
+    if (u.phone) {
+      const uDigits = u.phone.replace(/[^0-9]/g, '');
+      if (digitsPhone && uDigits && uDigits === digitsPhone) return true;
+      if (u.phone.trim().toLowerCase() === cleanId) return true;
+    }
+    return false;
+  });
+
   if (!user) {
-    return res.status(401).json({ error: `User with email "${email}" not found.` });
+    return res.status(401).json({ error: `User "${identifier}" not found.` });
   }
 
   const cleanPassword = (password || '').trim();
-  const isDemoAccount = ['admin@nasr.com', 'driver1@nasr.com', 'driver2@nasr.com', 'driver3@nasr.com', 'driver4@nasr.com', 'amrsono@nasr.com'].includes(cleanEmail);
+  const isDemoAccount = ['admin@nasr.com', 'driver1@nasr.com', 'driver2@nasr.com', 'driver3@nasr.com', 'driver4@nasr.com', 'amrsono@nasr.com'].includes(user.email.toLowerCase());
 
   if (user.password) {
     let isValid = false;
@@ -528,27 +541,43 @@ router.post('/auth/login', (req, res) => {
 // Register
 router.post('/auth/register', async (req, res) => {
   const { name, email, password, role, phone, carDetails } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: 'Name, email, and password are required' });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const existing = db.getUserByEmail(cleanEmail);
-  if (existing) {
-    return res.status(400).json({ error: 'User with this email already exists' });
+  if (!name || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
   }
 
   const validRole: UserRole = role === 'driver' ? 'driver' : 'customer';
+  const cleanName = name.trim();
+  const cleanPhone = phone ? phone.trim() : '';
+  const digitsPhone = cleanPhone.replace(/[^0-9]/g, '');
+
+  if (validRole === 'customer' && !cleanPhone) {
+    return res.status(400).json({ error: 'Mobile number is required' });
+  }
+
+  const cleanEmail = (email && email.trim())
+    ? email.trim().toLowerCase()
+    : (digitsPhone ? `${digitsPhone}@nasr.com` : `${cleanName.replace(/\s+/g, '').toLowerCase()}@nasr.com`);
+
+  const existing = db.getUsers().find((u) => {
+    if (u.email && u.email.toLowerCase() === cleanEmail) return true;
+    if (digitsPhone && u.phone && u.phone.replace(/[^0-9]/g, '') === digitsPhone) return true;
+    return false;
+  });
+
+  if (existing) {
+    return res.status(400).json({ error: 'A user with this mobile number or email already exists' });
+  }
+
   const hashedPassword = bcrypt.hashSync(password.trim(), 10);
 
   const newUser: User = {
     id: `user_${uuidv4().slice(0, 8)}`,
-    name: name.trim(),
+    name: cleanName,
     email: cleanEmail,
     password: hashedPassword,
     role: validRole,
-    phone: phone ? phone.trim() : '',
-    avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`,
+    phone: cleanPhone,
+    avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanName}`,
     carDetails: validRole === 'driver' ? carDetails || { model: 'Standard Sedan', plate: '7890 ABC', color: 'White' } : undefined,
     isOnline: validRole === 'driver' ? true : undefined,
     totalTrips: 0,
