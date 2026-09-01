@@ -359,6 +359,32 @@ export const api = {
     return db.users[0];
   },
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
+        return res.json();
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data.error) throw new Error(data.error);
+    } catch (err: any) {
+      if (err.message && !err.message.includes('fetch')) throw err;
+    }
+
+    // Fallback: Local DB
+    const uid = getCurrentUserId();
+    const db = getLocalDB();
+    const user = db.users.find((u) => u.id === uid);
+    if (!user) throw new Error('User not found');
+    user.password = newPassword;
+    saveLocalDB(db);
+    return { message: 'Password updated successfully' };
+  },
+
   // Trips
   async getTrips(): Promise<Trip[]> {
     try {
