@@ -730,8 +730,12 @@ export const CustomerDashboard: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-[10px] text-slate-400 uppercase font-bold">{t('customer.distance')}</div>
-                  <div className="text-sm font-bold text-slate-200 font-mono">
-                    {hasRoute ? `${distanceKm} ${distanceUnit}` : '--'}
+                  <div className="text-sm font-bold text-slate-200">
+                    {hasRoute ? (
+                      <span><span className="font-mono">{distanceKm}</span> <span className="text-xs text-slate-400">{distanceUnit}</span></span>
+                    ) : (
+                      <span className="text-slate-500 font-mono">--</span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right rtl:text-left">
@@ -743,13 +747,13 @@ export const CustomerDashboard: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <div className={`text-lg font-black font-mono ${matchedRoute ? 'text-purple-400' : 'text-emerald-400'}`}>
+                  <div className={`text-lg font-black ${matchedRoute ? 'text-purple-400' : 'text-emerald-400'}`}>
                     {hasRoute ? (
                       <>
-                        {estimatedFare} <span className="text-xs font-sans text-slate-400">{currencyLabel}</span>
+                        <span className="font-mono">{estimatedFare}</span> <span className="text-xs text-slate-400">{currencyLabel}</span>
                       </>
                     ) : (
-                      <span className="text-slate-500 text-sm font-normal">
+                      <span className="text-slate-500 text-sm font-semibold">
                         {i18n.language === 'ar' ? 'حدد الوجهة أولاً' : 'Enter destinations'}
                       </span>
                     )}

@@ -92,7 +92,9 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-2 pl-2 border-l border-slate-800 rtl:border-l-0 rtl:border-r rtl:pr-2">
               <div className="hidden md:flex flex-col text-right rtl:text-left leading-none">
                 <span className="text-xs font-bold text-slate-200">{getLocalizedUserName(user.name)}</span>
-                <span className="text-[10px] text-slate-400 font-mono">{user.email}</span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {user.role === 'customer' ? (user.phone || user.email) : (user.email || user.phone)}
+                </span>
               </div>
 
               <img

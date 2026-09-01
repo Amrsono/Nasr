@@ -8,9 +8,27 @@
   }
 }
 
-/* RTL Layout Enhancements */
+/* RTL Layout & Typography Enhancements */
 [dir="rtl"] {
   text-align: right;
+  font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif !important;
+}
+
+[dir="rtl"] body,
+[dir="rtl"] button,
+[dir="rtl"] input,
+[dir="rtl"] select,
+[dir="rtl"] textarea {
+  font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Ensure Arabic cursive script never detaches or breaks */
+[dir="rtl"] * {
+  letter-spacing: normal !important;
+}
+
+[dir="rtl"] .font-mono {
+  font-family: 'Cairo', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 [dir="rtl"] .leaflet-top {
